@@ -1,0 +1,10 @@
+# Compiled source #
+###################
+a*/*.o
+a*/*.out
+
+# Packages #
+############
+*.zip
+*.tar.gz
+*.tgz
