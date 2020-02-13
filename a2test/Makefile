@@ -12,7 +12,10 @@ test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile
 	
 a1test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o a1-test.o
 	$(CC) -o a1test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o a1-test.o -lfl
-	
+
+dBFileTest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o
+	$(CC) -o dBFileTest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o -lfl -lpthread -lgtest
+
 test.o: test.cc
 	$(CC) -g -c test.cc
 
@@ -33,6 +36,9 @@ BigQ.o: BigQ.cc
 
 DBFile.o: DBFile.cc
 	$(CC) -g -c DBFile.cc
+
+DBFileTest.o: DBFileTest.cc
+	$(CC) -g -c DBFileTest.cc
 
 File.o: File.cc
 	$(CC) -g -c File.cc

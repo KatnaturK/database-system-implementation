@@ -63,6 +63,10 @@ int Page :: GetFirst (Record *firstOne) {
 	return 1;
 }
 
+int Page :: GetLength () {
+	return numRecs;
+}
+
 
 int Page :: Append (Record *addMe) {
 	char *b = addMe->GetBits();

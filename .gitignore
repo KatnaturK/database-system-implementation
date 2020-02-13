@@ -2,6 +2,12 @@
 ###################
 a*/*.o
 a*/*.out
+dbfiles/
+tpch-dbgen/
+
+# Editors #
+###########
+.vscode
 
 # Packages #
 ############
