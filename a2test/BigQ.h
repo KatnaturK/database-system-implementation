@@ -1,12 +1,36 @@
 #ifndef BIGQ_H
 #define BIGQ_H
-#include <pthread.h>
+
 #include <iostream>
+#include <pthread.h>
+#include <vector>
+
 #include "Pipe.h"
 #include "File.h"
 #include "Record.h"
 
 using namespace std;
+
+class OrderedRecord {
+public:
+
+	OrderedRecord (Record * record, OrderMaker *sortOrder) {
+		this->record = record;
+		this->sortOrder = sortOrder;
+	}
+	~OrderedRecord ();
+
+	static bool compareRecords(OrderedRecord *orderedRecord1, OrderedRecord *orderedRecord2);
+
+	Record *record;
+	OrderMaker *sortOrder;
+
+};
+
+class PageRun {
+public:
+	int startCount, endCount;
+};
 
 
 class BigQ {
@@ -17,16 +41,17 @@ public:
 
 private:
 
-	int runCount, runLength;
+	int pageCount, runCount, runLength;
 	File runFile;
-	static OrderMaker *sortOrder;
+	OrderMaker *sortOrder;
 	Pipe *in, *out;
+	vector<PageRun *> pageRuns;
 
 	static void* worker(void* workerThread);
-	static bool compareRecords(Record *record1, Record *record2);
 
-	void tppmsPhase1 ();
-	void generateRuns (vector<Record *>);
+	void tpmmsPhase1 ();
+	void tpmmsPhase2 ();
+	void generateRuns (vector<OrderedRecord *>);
 
 };
 
