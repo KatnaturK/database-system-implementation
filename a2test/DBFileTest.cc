@@ -4,14 +4,7 @@
 
 TEST(DBFileTest, Create_Equal) {
     DBFile dbfile;
-    ASSERT_EQ(1, dbfile.Create( c->path(), heap, NULL));
-    ASSERT_EQ(1, dbfile.Create( li->path(), heap, NULL));
     ASSERT_EQ(1, dbfile.Create( n->path(), heap, NULL));
-    ASSERT_EQ(1, dbfile.Create( o->path(), heap, NULL));
-    ASSERT_EQ(1, dbfile.Create( p->path(), heap, NULL));
-    ASSERT_EQ(1, dbfile.Create( ps->path(), heap, NULL));
-    ASSERT_EQ(1, dbfile.Create( r->path(), heap, NULL));
-    ASSERT_EQ(1, dbfile.Create( s->path(), heap, NULL));
 }
 
 TEST(DBFileTest, Create_NotEqual) {
@@ -22,14 +15,7 @@ TEST(DBFileTest, Create_NotEqual) {
 
 TEST(DBFileTest, Open_Equal) {
     DBFile dbfile;
-    ASSERT_EQ(1, dbfile.Open( c->path()) );
-    ASSERT_EQ(1, dbfile.Open( li->path()) );
     ASSERT_EQ(1, dbfile.Open( n->path()) );
-    ASSERT_EQ(1, dbfile.Open( o->path()) );
-    ASSERT_EQ(1, dbfile.Open( p->path()) );
-    ASSERT_EQ(1, dbfile.Open( ps->path()) );
-    ASSERT_EQ(1, dbfile.Open( r->path()) );
-    ASSERT_EQ(1, dbfile.Open( s->path()) );
 }
 
 TEST(DBFileTest, Open_NotEqual) {
@@ -51,6 +37,26 @@ TEST(DBFileTest, Close_Nations_DBFile) {
     dbfile.Load (*(n->schema ()), tbl_path);
     ASSERT_TRUE( dbfile.Close() != 0);
 }
+
+// void loadFile(relation currRel) {
+//     DBFile dbfile;
+//     char tbl_path[100];
+//     ASSERT_EQ(1, dbfile.Create( currRel.path(), heap, NULL));
+//     sprintf (tbl_path, "%s%s.tbl", tpch_dir, currRel.name()); 
+//     dbfile.Load (*(currRel.schema ()), tbl_path);
+//     ASSERT_EQ(1, dbfile.Open( currRel.path()) );
+// }
+
+// TEST(DBFileTest, Load_Equal) {
+//     loadFile(*c);
+//     loadFile(*li);
+//     loadFile(*o);
+//     // loadFile(*n);
+//     loadFile(*p);
+//     loadFile(*ps);
+//     loadFile(*r);
+//     loadFile(*s);
+// }
 
 int main(int argc, char **argv) {
     setup ();

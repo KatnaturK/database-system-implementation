@@ -1,57 +1,69 @@
 #ifndef BIGQ_H
 #define BIGQ_H
-
+#include <algorithm>
 #include <iostream>
-#include <pthread.h>
+#include <map>
+#include <math.h>
+#include <stdlib.h>
+#include <queue>
 #include <vector>
 
-#include "Pipe.h"
+#include "ComparisonEngine.h"
 #include "File.h"
+#include "Pipe.h"
 #include "Record.h"
 
 using namespace std;
 
-class OrderedRecord {
+class ComparisonEngine;
+
+class Phase1Compare{
+
+OrderMaker *sortOrder;
+
 public:
 
-	OrderedRecord (Record * record, OrderMaker *sortOrder) {
-		this->record = record;
-		this->sortOrder = sortOrder;
+	Phase1Compare(OrderMaker *inSortOrder) {
+		sortOrder = inSortOrder;
 	}
-	~OrderedRecord ();
 
-	static bool compareRecords(OrderedRecord *orderedRecord1, OrderedRecord *orderedRecord2);
+	bool operator()(Record* record1, Record* record2) {
+		ComparisonEngine ce;
+		if (ce.Compare (record1, record2, sortOrder) < 0) return true;
+		else return false;
+	}
+};
 
-	Record *record;
+class Phase2Compare{
+
 	OrderMaker *sortOrder;
 
+public:
+
+	Phase2Compare(OrderMaker *inSortOrder) {
+		sortOrder = inSortOrder;
+	}
+
+	bool operator()(Record* record1, Record* record2) {
+		ComparisonEngine ce;
+		if (ce.Compare (record1, record2, sortOrder) < 0) return false;
+		else return true;
+	}
 };
 
-class PageRun {
-public:
-	int startCount, endCount;
-};
+class BigQ  {
 
-
-class BigQ {
 public:
+
+	int runLength;
+	File runFile;
+	OrderMaker *sortOrder;
+	Pipe *in, *out;
 	
 	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);
 	~BigQ ();
 
-private:
-
-	int pageCount, runCount, runLength;
-	File runFile;
-	OrderMaker *sortOrder;
-	Pipe *in, *out;
-	vector<PageRun *> pageRuns;
-
-	static void* worker(void* workerThread);
-
-	void tpmmsPhase1 ();
-	void tpmmsPhase2 ();
-	void generateRuns (vector<OrderedRecord *>);
+	// static void* worker(void* workerThread);
 
 };
 
