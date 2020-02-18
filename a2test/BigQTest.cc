@@ -19,14 +19,14 @@ vector<Record*> produceRecords (char* fileName) {
     return records;
 }
 
-TEST(BigQTest, GenerateRuns_CustomerTbl) {
+TEST(BigQTest, GenerateRuns_OrderTbl) {
     BigQ bigQ;
     int runCount = 0, runLength = 16;
     File runFile;
     bigQ.initFile(runFile);
     map<int,Page*> overflow;
-    vector<Record*> records = produceRecords (c->path ());
-    ASSERT_EQ (234, bigQ.generateRuns (records, runCount, runLength, runFile, overflow));
+    vector<Record*> records = produceRecords ("gtests/orders.bin");
+    ASSERT_EQ (18, bigQ.generateRuns (records, runCount, runLength, runFile, overflow));
 }
 
 TEST(BigQTest, GenerateRuns_NationTbl) {
@@ -35,7 +35,7 @@ TEST(BigQTest, GenerateRuns_NationTbl) {
     File runFile;
     bigQ.initFile(runFile);
     map<int,Page*> overflow;
-    vector<Record*> records = produceRecords (n->path ());
+    vector<Record*> records = produceRecords ("gtests/nation.bin");
     ASSERT_EQ (1, bigQ.generateRuns (records, runCount, runLength, runFile, overflow));
 }
 
