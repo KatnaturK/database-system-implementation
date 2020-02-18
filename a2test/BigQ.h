@@ -27,6 +27,7 @@ public:
 		sortOrder = inSortOrder;
 	}
 
+	// compare operator to sort records into runs for phase 1 of tpmms algorithm.
 	bool operator()(Record* record1, Record* record2) {
 		ComparisonEngine ce;
 		if (ce.Compare (record1, record2, sortOrder) < 0) return true;
@@ -44,6 +45,7 @@ public:
 		sortOrder = inSortOrder;
 	}
 
+	// compare operator to sort records and merge using priority queue for phase 2 of tpmms algorithm.
 	bool operator()(Record* record1, Record* record2) {
 		ComparisonEngine ce;
 		if (ce.Compare (record1, record2, sortOrder) < 0) return false;
@@ -60,10 +62,19 @@ public:
 	OrderMaker *sortOrder;
 	Pipe *in, *out;
 	
+	BigQ ();
 	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);
 	~BigQ ();
 
-	// static void* worker(void* workerThread);
+	static void* worker(void* workerThread);
+
+	// Phase 1 of Two-Pass Multiway Merge Sort Algorithm.
+	void tpmmsPhase1 (Pipe *in, OrderMaker *sortOrder, int &runCount, int runLength, File &runFile,	map<int,Page*> &overflow);
+	// Phase 2 of Two-Pass Multiway Merge Sort Algorithm.
+	void tpmmsPhase2 (Pipe *out, OrderMaker *sortOrder, int runCount, int runLength, File &runFile, map<int,Page*> overflow);
+
+	void initFile (File &runfile);
+	int generateRuns (vector<Record *> &records, int &runCount, int runLength, File &runFile, map<int,Page*> &overflow);
 
 };
 
