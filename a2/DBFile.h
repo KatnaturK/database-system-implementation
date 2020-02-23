@@ -29,8 +29,6 @@ class DBFile {
         virtual int GetNext (Record &fetchme, CNF &cnf, Record &literal) = 0;
     };
 
-    GenericDBFile *internalDBFile;
-
     class Heap : public GenericDBFile {
         char *filename;
         File *heapfile;
@@ -56,6 +54,12 @@ class DBFile {
         int GetNext (Record &fetchme);
         int GetNext (Record &fetchme, CNF &cnf, Record &literal);
     };
+
+    GenericDBFile *internalDBFile;
+
+    char* GetMetafileName (const char *fpath);
+    
+    fType GetTypeFromMetafile (const char *fpath);
 
 
 public:

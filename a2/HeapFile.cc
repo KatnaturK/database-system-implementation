@@ -44,7 +44,6 @@ int DBFile::Heap::Create (const char *fpath, fType f_type, void *startup) {
     char *filename = strdup(fpath);
     if (filename != NULL) {
         strcpy(filename, fpath);
-        std::cout<<"filename "<<filename<<"\n";
         heapfile->Open(0, filename);
         return 1;
     }
