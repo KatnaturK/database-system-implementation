@@ -56,9 +56,7 @@ region      |  r_name 	 	                       | (r_name)
        
 partsupp    |  ps_suppkey, ps_partkey 		       | (ps_suppkey) AND (ps_partkey)
 
-lineitem    |  l_shipdate, l_extendedprice, l_quantity | (l_shipdate) AND 
-							 (l_extendedprice) AND 
-							 (l_quantity)
+lineitem    |  l_shipdate, l_extendedprice, l_quantity | (l_shipdate) AND (l_extendedprice) AND (l_quantity)
 
 How the driver works:
 =====================

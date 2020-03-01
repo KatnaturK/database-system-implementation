@@ -7,17 +7,17 @@ ifdef linux
 tag = -n
 endif
 
-test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o Pipe.o y.tab.o lex.yy.o test.o
-	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o Pipe.o y.tab.o lex.yy.o test.o -lfl -lpthread
+test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o test.o
+	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o test.o -lfl -lpthread
 	
-a1test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o a1-test.o
-	$(CC) -o a1test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o y.tab.o lex.yy.o a1-test.o -lfl
+a1test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o a1-test.o
+	$(CC) -o a1test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o a1-test.o -lfl
 
-dBFileTest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o
-	$(CC) -o dBFileTest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o -lfl -lpthread -lgtest
+dBFileTest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o
+	$(CC) -o dBFileTest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o -lfl -lpthread -lgtest
 
-bigQTest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o BigQTest.o
-	$(CC) -o bigQTest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o BigQTest.o -lfl -lpthread -lgtest
+bigQTest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o BigQTest.o
+	$(CC) -o bigQTest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o BigQTest.o -lfl -lpthread -lgtest
 
 test.o: test.cc
 	$(CC) -g -c test.cc
@@ -39,6 +39,9 @@ BigQ.o: BigQ.cc
 
 BigQTest.o: BigQTest.cc
 	$(CC) -g -c BigQTest.cc
+
+SortedFile.o: SortedFile.cc
+	$(CC) -g -c SortedFile.cc
 
 HeapFile.o: HeapFile.cc
 	$(CC) -g -c HeapFile.cc

@@ -24,6 +24,7 @@ void* BigQ :: worker (void *workerThread) {
 	BigQ *bigQWorkerThread = (BigQ*) workerThread;
 	int runCount = 0;
 	map<int,Page*> overflow;
+	std::cout << "Phase 1 started\n";
 	bigQWorkerThread->tpmmsPhase1 (
 		bigQWorkerThread->in,
 		bigQWorkerThread->sortOrder,
@@ -32,6 +33,7 @@ void* BigQ :: worker (void *workerThread) {
 		bigQWorkerThread->runFile,
 		overflow
 	);
+	std::cout << "Phase 2 started\n";
 	bigQWorkerThread->tpmmsPhase2 (
 		bigQWorkerThread->out,
 		bigQWorkerThread->sortOrder,
@@ -40,6 +42,7 @@ void* BigQ :: worker (void *workerThread) {
 		bigQWorkerThread->runFile,
 		overflow
 	);
+	std::cout << "Phase 2 done\n";
 	bigQWorkerThread->runFile.Close ();
 	bigQWorkerThread->out->ShutDown ();
 }
@@ -78,10 +81,10 @@ void BigQ :: tpmmsPhase1 (Pipe *in, OrderMaker *sortOrder, int &runCount, int ru
 					records.push_back (tmpRecord);
 					tmpRecord = new (nothrow) Record();
 				}
-				delete pages[i];
-				delete tmpRecord;
-				pages[i] = NULL;
-				tmpRecord = NULL;
+				// delete tmpRecord;
+				// delete pages[i];
+				// pages[i] = NULL;
+				// tmpRecord = NULL;
 			}
 
 			// cout << "Sorting runs pages." << endl;
@@ -105,6 +108,7 @@ int BigQ :: generateRuns (vector<Record *> &records, int &runCount, int runLengt
 	// cout << "Writing sorted runs to a file. " << endl;
 	int pageCount = 0;
 	Page *filePage = new (nothrow) Page ();
+
 	for (int i = 0; i < records.size (); i++) {
 		if (!filePage->Append (records[i])) {
 			pageCount++;
@@ -112,12 +116,13 @@ int BigQ :: generateRuns (vector<Record *> &records, int &runCount, int runLengt
 			filePage->EmptyItOut ();
 			filePage->Append (records[i]);
 		}
-		delete records[i];
-		records[i] = NULL;
+		// delete records[i];
+		// records[i] = NULL;
 	}
+
 	if (pageCount < runLength) runFile.AddPage (filePage, runCount++);
 	else overflow[runCount - 1] = filePage;
-	filePage = NULL;
+	delete filePage;
 	return runCount;
 }
 

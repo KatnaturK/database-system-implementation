@@ -7,12 +7,16 @@
 #include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
+#include "BigQ.h"
 
 typedef enum {heap, sorted, tree} fType;
 
-using namespace std;
+struct SortInfo {
+    OrderMaker *myOrder;
+    int runlength;
+};
 
-// stub DBFile header..replace it with your own DBFile.h 
+using namespace std;
 
 class DBFile {
 
@@ -29,7 +33,8 @@ class DBFile {
         virtual int GetNext (Record &fetchme, CNF &cnf, Record &literal) = 0;
     };
 
-    class Heap : public GenericDBFile {
+    //--------------- HEAPFILE -------------//
+    class HeapFile : public GenericDBFile {
         char *filename;
         File *heapfile;
         Page *deltapage;
@@ -41,8 +46,45 @@ class DBFile {
         bool fileExists(const char *filePath);
 
     public:
-        Heap ();
-        ~Heap ();
+        HeapFile ();
+        ~HeapFile ();
+
+        int Create (const char *f_path, fType f_type, void *startup);
+        void Load (Schema &f_schema, const char *loadpath);
+        int Open (const char *f_path);
+        void MoveFirst ();
+
+        int Close ();
+        void Add (Record &rec);
+        int GetNext (Record &fetchme);
+        int GetNext (Record &fetchme, CNF &cnf, Record &literal);
+    };
+
+    //------------SORTED FILE--------------//
+    class SortedFile : public GenericDBFile {
+        char *filename;
+        File *sortedfile;
+        ComparisonEngine comp;
+        Page *readpage;
+        int readPageNumber;
+        bool readmode;
+        int runlength;
+
+        OrderMaker *sort_order;
+        Pipe *in_pipe;
+        Pipe *out_pipe;
+        BigQ *diff_file;
+
+        void initializePipes();
+        void initializeBigQ();
+        void deleteBigQ();
+        void addRecordToFile(File *file, Page *writePage, Record *rec);
+        void mergeDiffFile();
+        bool fileExists(const char *filePath);
+
+    public:
+        SortedFile (int runlength, OrderMaker *o);
+        ~SortedFile ();
 
         int Create (const char *f_path, fType f_type, void *startup);
         void Load (Schema &f_schema, const char *loadpath);
@@ -58,8 +100,10 @@ class DBFile {
     GenericDBFile *internalDBFile;
 
     char* GetMetafileName (const char *fpath);
-    
+
     fType GetTypeFromMetafile (const char *fpath);
+    int GetRunlengthFromMetafile (const char *fpath);
+    OrderMaker* GetSortOrderFromMetafile (const char *fpath);
 
 
 public:

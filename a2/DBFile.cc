@@ -21,18 +21,28 @@ DBFile::~DBFile () {
 int DBFile::Create (const char *fpath, fType file_type, void *startup) {
     ofstream metafile;
     char *metafilename = GetMetafileName(fpath);
-
     metafile.open(metafilename);
-    std::cout<<file_type;
+
     switch(file_type) {
         case heap:
             metafile << "heap\n";
-            internalDBFile = new Heap();
+            internalDBFile = new HeapFile();
             metafile.close();
             return internalDBFile->Create(fpath, heap, NULL);
+
         case sorted:
             metafile << "sorted\n";
-            break;
+            {
+                SortInfo sortinfo = *(SortInfo *) startup;
+                OrderMaker *o = sortinfo.myOrder;
+                // memset(o, 0, sizeof(OrderMaker));
+
+                metafile << sortinfo.runlength << "\n";
+                metafile << *o;
+                internalDBFile = new SortedFile(sortinfo.runlength, sortinfo.myOrder);   
+            }
+            return internalDBFile->Create(fpath, sorted, startup);
+
         case tree:
             break;
         default:
@@ -45,9 +55,14 @@ int DBFile::Open (const char *fpath) {
     fType ftype = GetTypeFromMetafile(fpath);
     switch (ftype) {
         case heap:
-            internalDBFile = new Heap();
+            internalDBFile = new HeapFile();
             break;
         case sorted:
+        {
+            int runlength = GetRunlengthFromMetafile(fpath);
+            OrderMaker *sort_order = GetSortOrderFromMetafile(fpath);
+            internalDBFile = new SortedFile(runlength, sort_order);
+        }
             break;
         case tree:
             break;
@@ -102,4 +117,29 @@ fType DBFile::GetTypeFromMetafile (const char *fpath) {
     std::cout << line;
     std::cerr << "Something's wrong with metafile!!\n"; 
     return heap; 
+}
+
+int DBFile::GetRunlengthFromMetafile (const char *fpath) {
+    ifstream metafile(GetMetafileName(fpath));
+    string line;
+    int runlength = 0;
+    if (metafile.good()) {
+        getline(metafile, line);
+        metafile >> runlength;
+    }
+    metafile.close();
+    return runlength;
+}
+
+OrderMaker* DBFile::GetSortOrderFromMetafile (const char *fpath) {
+    ifstream metafile(GetMetafileName(fpath));
+    OrderMaker *sort_order = new OrderMaker();
+    string line;
+    if (metafile.good()) {
+        getline(metafile, line);
+        getline(metafile, line);
+    }
+    metafile >> (*sort_order);
+    metafile.close();
+    return sort_order;   
 }
