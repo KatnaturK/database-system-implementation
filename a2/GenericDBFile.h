@@ -19,17 +19,16 @@ public:
         GenericDBFile ();
         virtual ~GenericDBFile ();
 
-        bool dirty;
-        bool pageInRead;
-        bool pageInWrite;
-        ComparisonEngine comp;
+        bool readPage;
+        bool writePage;
+        ComparisonEngine ce;
         fstream fstatus;
         int runlen;
         int pageNumber;
         int pageCount;
-        File f;
+        File runFile;
         FILE *tableFile;
-        OrderMaker sort_order;
+        OrderMaker sortOrder;
         Page p;
         Record *newRecord;
         

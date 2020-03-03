@@ -15,7 +15,7 @@ typedef struct {
         Schema *fileSchema;
         File *file;
         char* loadPath;
-} producer_util;
+} workerStruct;
 
 typedef enum {read, write} mode;
 
@@ -31,12 +31,12 @@ public:
         void Add (Record &rec);
         int Close ();
         int Create (char *filePath, fileTypeEnum fileEnum, void *startup);
-        void FixDirtyFile();
         int GetNext (Record &fetchMe);
         int GetNext (Record &fetchMe, CNF &cnf, Record &literal);
         void Load (Schema &fileSchema, char *loadpath);
         void MoveFirst ();
         int Open (char *filePath);
-	void SwitchMode(mode nextMode);
+	void ToggleMode(mode nextMode);
+        void TwoPassMergeing ();
 };
 #endif

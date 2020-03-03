@@ -33,7 +33,7 @@ int DBFile::Open (char *filePath) {
   } else if (fileType == sorted) {
     // cout << "Trying to open Sorted DBFIle";
     genericDBFile = new SortedFile ();
-    genericDBFile->sort_order = run.sortOrder;
+    genericDBFile->sortOrder = run.sortOrder;
     genericDBFile->runlen = run.runlength;
     return genericDBFile->Open (filePath);
 
@@ -78,7 +78,7 @@ int DBFile::Create (char *filePath, fileTypeEnum fileType, void *startup) {
 
     // cout << "saving into myvar" << endl;
     genericDBFile = new SortedFile(); 
-    genericDBFile->sort_order = *(sort->sortOrder);
+    genericDBFile->sortOrder = *(sort->sortOrder);
     genericDBFile->runlen = sort->length;
 
     // cout << "Sending to Sorted File" << endl;

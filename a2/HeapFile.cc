@@ -8,8 +8,8 @@ using namespace std;
 HeapFile::HeapFile () {
   int pageCount = 0;
   pageNumber = 0;
-  pageInRead = true;
-  pageInWrite = false;
+  readPage = true;
+  writePage = false;
   pageCount = 0;
 }
 
@@ -19,13 +19,13 @@ int HeapFile::Create (char *filePath, fileTypeEnum fileType, void *startup) {
  
   fstatus.open (filePath);
   if (fstatus.is_open ()) {
-    f.Open (1,filePath);
-    pageInWrite = true;
+    runFile.Open (1,filePath);
+    writePage = true;
 
   } else {
-      f.Open (0,filePath);
-      f.AddPage (&p,0);
-      pageInWrite = true;
+      runFile.Open (0,filePath);
+      runFile.AddPage (&p,0);
+      writePage = true;
       pageNumber = 0;
       pageCount = 1;
 
@@ -51,32 +51,32 @@ int HeapFile::Open (char *filePath) {
 
   fstatus.open (filePath);
   if (fstatus.is_open())
-    f.Open (1,filePath);
+    runFile.Open (1,filePath);
   else 
-    f.Open (0,filePath);
+    runFile.Open (0,filePath);
 
-  pageInRead = true;
-  pageCount = f.GetLength ();
+  readPage = true;
+  pageCount = runFile.GetLength ();
   MoveFirst ();
   return 1;
 }
 
 void HeapFile::MoveFirst () {
 
-  if (f.GetLength () == 0) 
+  if (runFile.GetLength () == 0) 
    cerr << "DB-000: Invalid Operation ! Empty File !! " ;
   else {   
-    if (pageInWrite) {
-      f.AddPage (&p,pageNumber);
+    if (writePage) {
+      runFile.AddPage (&p,pageNumber);
       p.EmptyItOut ();
       pageNumber = 0;
-      f.GetPage (&p, pageNumber);
-      pageInWrite = false;
+      runFile.GetPage (&p, pageNumber);
+      writePage = false;
 
     } else {
       p.EmptyItOut();
       pageNumber=0;
-      f.GetPage(&p, pageNumber);
+      runFile.GetPage(&p, pageNumber);
 
     }
   }
@@ -84,13 +84,13 @@ void HeapFile::MoveFirst () {
 
 int HeapFile::Close () {
 
-  if (pageInWrite) {
-    f.AddPage (&p,pageNumber);
-    pageInWrite = false;
+  if (writePage) {
+    runFile.AddPage (&p,pageNumber);
+    writePage = false;
 
   } 
   p.EmptyItOut ();
-  if (f.Close () >= 0)
+  if (runFile.Close () >= 0)
     return 1;
   else 
     return 0;
@@ -99,16 +99,16 @@ int HeapFile::Close () {
 
 void HeapFile::Add (Record &rec) {
 
- if (pageInRead) {
+ if (readPage) {
     p.EmptyItOut ();
-    pageNumber = f.GetLength ()- 2;
-    f.GetPage (&p,f.GetLength ()- 2);
-    pageInRead = false;
-    pageInWrite= true;
+    pageNumber = runFile.GetLength ()- 2;
+    runFile.GetPage (&p,runFile.GetLength ()- 2);
+    readPage = false;
+    writePage= true;
   }
 
   if (!p.Append (&rec)) {
-    f.AddPage (&p,pageNumber);
+    runFile.AddPage (&p,pageNumber);
     p.EmptyItOut ();
     pageCount++;
     pageNumber++;
@@ -119,18 +119,18 @@ void HeapFile::Add (Record &rec) {
 
 int HeapFile::GetNext (Record &fetchMe) {
 
-  if (pageInWrite) {
-    f.AddPage(&p, pageNumber);
-    pageInWrite = false;
-    pageInRead=true;
+  if (writePage) {
+    runFile.AddPage(&p, pageNumber);
+    writePage = false;
+    readPage=true;
 
   }
 
   if (p.GetFirst (&fetchMe)) 
     return 1;
   else {
-    if (pageNumber++ < f.GetLength () - 2) {
-      f.GetPage (&p, pageNumber);
+    if (pageNumber++ < runFile.GetLength () - 2) {
+      runFile.GetPage (&p, pageNumber);
       if (p.GetFirst (&fetchMe)) 
         return 1;
     }
@@ -142,14 +142,14 @@ int HeapFile::GetNext (Record &fetchMe) {
 
 int HeapFile::GetNext (Record &fetchMe, CNF &cnf, Record &literal) {
 
-  if (pageInWrite) {
-    f.AddPage (&p, pageNumber);
-    pageInWrite = false;
-    pageInRead = true;
+  if (writePage) {
+    runFile.AddPage (&p, pageNumber);
+    writePage = false;
+    readPage = true;
   }
 
   while (GetNext (fetchMe)) {
-    if (comp.Compare (&fetchMe, &literal, &cnf)) 
+    if (ce.Compare (&fetchMe, &literal, &cnf)) 
       return 1;
   }
   
