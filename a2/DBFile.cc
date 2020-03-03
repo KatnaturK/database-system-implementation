@@ -72,7 +72,7 @@ else if (f_type == sorted){
   //cout << "Trying to create DBFile" << endl;
   myMeta.filetype = sorted;
   //cout << "Statement run" << endl;
-  mysrt =(strtup*)startup;
+  mysrt =(sortinfo*)startup;
   
   //cout << "Startup coded" << endl;
   //cout << "printing l: " << &(mysrt->l) << endl;

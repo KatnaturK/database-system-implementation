@@ -13,7 +13,7 @@ BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen) {
 
 	inputPipe = &in;
 	outputPipe = &out;
-	sortingOrder = &sortorder;
+	sort_order = &sortorder;
 	pthread_t sortingThread;
 	runLength = runlen;
 	fileName ="BigQtmp_001.bin";
@@ -74,7 +74,7 @@ void BigQ::sortRecords()
                 
                 cpyRec = new recordsW1;
                 (cpyRec->tmpRecord).Copy(getRecord);
-                (cpyRec->sortedOrder) = sortingOrder;
+                (cpyRec->sortedOrder) = sort_order;
 		if(!curPage.Append(getRecord)) 
 		{
 		    pageCnt++;
@@ -120,7 +120,7 @@ void BigQ :: writeInFile(vector<recordsW1*> rcVector)
        // cout << "Writing in File" << endl;	
 	numberRuns++;
         Page myPage;
-        runmetaData *rmd = new runmetaData;
+        runMetaData *rmd = new runMetaData;
         rmd->startPage = currentPageNum;
         //int apcnt=0;
         vector<recordsW1*>::iterator startIt = rcVector.begin();
@@ -161,13 +161,13 @@ void BigQ::mergeRecords()
 	//cout <<"In Merge Records" << endl;
 	int compRuns = 0; 
         int cntr=0;
-	vector<pageWrap*> PageVector; 
-	pageWrap *fPage = NULL; 
+	vector<pageWrapper*> PageVector; 
+	pageWrapper *fPage = NULL; 
 	int curPNum = 0; 
 	for(int i=1; i<=numberRuns; i++) 
 	{	
 	   curPNum = (runmetaDataVec[i-1])->startPage; 
-	   fPage = new pageWrap;
+	   fPage = new pageWrapper;
 	   sortedFile.GetPage( &(fPage->newPage), curPNum); 
 	   fPage->currentPage = curPNum;
 	   PageVector.push_back(fPage); 
@@ -180,7 +180,7 @@ void BigQ::mergeRecords()
 	   if(((PageVector[j])->newPage).GetFirst( &(tempRec->newRecord)) != 0) 
 	   {	   
 	       tempRec->runPosition = (j+1);
-	       (tempRec->sortedOrder) = (this->sortingOrder); 
+	       (tempRec->sortedOrder) = (this->sort_order); 
 	       mergeset.insert(tempRec);
 	   }
            else 

@@ -4,46 +4,34 @@
 #include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
-#include <fstream>
 #include "GenericDBFile.h"
 
+GenericDBFile::GenericDBFile () {
+} 
 
-       GenericDBFile::GenericDBFile (){
-        } 
-        
+int GenericDBFile:: Create (char *fpath, fType file_type, void *startup) {
+}
 
-      int  GenericDBFile:: Create (char *fpath, fType file_type, void *startup) {
+int GenericDBFile:: Open(char *fpath) {
+}
 
-       }
+int GenericDBFile:: Close () {
+}
 
-      int  GenericDBFile:: Open(char *fpath){
+void GenericDBFile:: Load (Schema &myschema, char *loadpath) {
+}
 
-       }
+void GenericDBFile:: MoveFirst () {
+}
 
-      int  GenericDBFile:: Close (){
+void GenericDBFile:: Add (Record &addme) {
+}
 
-       }
+int GenericDBFile:: GetNext (Record &fetchme) {
+}
 
-      void  GenericDBFile:: Load (Schema &myschema, char *loadpath){
-      
-       }
+int GenericDBFile:: GetNext (Record &fetchme, CNF &cnf, Record &literal) {
+}
 
-      void  GenericDBFile:: MoveFirst (){
-
-       }
-
-     void  GenericDBFile:: Add (Record &addme){
-      
-       }
-
-     int  GenericDBFile:: GetNext (Record &fetchme){
-
-       }
-
-     int  GenericDBFile:: GetNext (Record &fetchme, CNF &cnf, Record &literal){
-
-       }
-
-       GenericDBFile::~GenericDBFile (){
-
-       };
+GenericDBFile::~GenericDBFile () {
+};

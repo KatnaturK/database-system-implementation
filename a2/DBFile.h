@@ -7,20 +7,17 @@
 #include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
-#include <fstream>
 #include "GenericDBFile.h"
 
 struct metadata {
         int runlength;
         OrderMaker sorting_order;
         fType filetype;
-
 };
 
-struct strtup {
+struct sortinfo {
         OrderMaker *ord;
         int l;
-
 };
 
 
@@ -35,7 +32,7 @@ public:
         int Create (char *fpath, fType file_type, void *startup);
         int Open (char *fpath);
         int Close ();
-        strtup *mysrt;
+        sortinfo *mysrt;
 
         void Load (Schema &myschema, char *loadpath);
 
