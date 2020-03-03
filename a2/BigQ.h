@@ -12,9 +12,11 @@ using namespace std;
 
 class recordsW {
 public:
+
         Record newRecord;
         int runPosition;
         OrderMaker *sortedOrder;
+
 };
 
 
@@ -25,16 +27,16 @@ public:
         OrderMaker *sortedOrder;
 };
 
-class runMetaData {
+class runmetaData {
 public:
-        int startPage, endPage;
+int startPage, endPage;
 };
 
 class BigQ {
 
-        Pipe *inputPipe, *outputPipe;
-        OrderMaker *sort_order;
-        int runLength;
+Pipe *inputPipe, *outputPipe;
+OrderMaker *sortingOrder;
+int runLength;
 
 public:
 
@@ -46,7 +48,7 @@ public:
         void sortRecords();
         void mergeRecords();
         vector<pair<int,int> > pageBegin;
-        vector<runMetaData*> runmetaDataVec;
+        vector<runmetaData*> runmetaDataVec;
          
         File sortedFile;
         char *fileName;
@@ -55,9 +57,9 @@ public:
 	~BigQ ();
 };
 
-class pageWrapper {
+class pageWrap {
 public:
-        Page newPage; 
-        int currentPage; 
+Page newPage; 
+int currentPage; 
 };
 #endif

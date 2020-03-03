@@ -1,266 +1,205 @@
-#include "TwoWayList.h"
-#include "Record.h"
-#include "Schema.h"
-#include "File.h"
-#include "Comparison.h"
-#include "ComparisonEngine.h"
-#include "SortedFile.h"
-#include "Defs.h"
 #include <fstream>
 #include <iostream>
-#include "Pipe.h"
-#include "GenericDBFile.h"
+
+#include "SortedFile.h"
 #include "BigQ.h"
 
 using namespace std;
 
-SortedFile::SortedFile () 
-{
+SortedFile::SortedFile () {}
 
-}
+SortedFile::~SortedFile () {}
 
-
-
-SortedFile::~SortedFile ()
-{
-
-}
-
-void SortedFile::SwitchMode(mode new_mode){
-	if(status == new_mode)
-	{
+void SortedFile::SwitchMode (mode newMode){
+	if (fileMode == newMode)
 		return;
-	}
-	else
-	{
-		if(new_mode == read)
-		{
-			f.AddPage(&p, pageNumber);
-                        //cout << "Adding page number to disk : " << pageNumber << endl;
-			FixDirtyFile();
-			status = read;
+	else {
+		if (newMode == read) {
+			f.AddPage (&p, pageNumber);
+            //cout << "Adding page number to disk : " << pageNumber << endl;
+			FixDirtyFile ();
+			fileMode = read;
 			return;
-		}
-		else
-		{
-			p.EmptyItOut();
-			pageNumber = f.GetLength()-2;
-			f.GetPage(&p,pageNumber);
-			status = write;
+
+		} else {
+			p.EmptyItOut ();
+			pageNumber = f.GetLength () - 2;
+			f.GetPage (&p, pageNumber);
+			fileMode = write;
 			return;
+
 		}
 	}	
 } 
 
-
 void *producer (void *arg) {
-	producer_util *myprd = (producer_util *) arg;
-	Record temp;
-	int counter = 0;
-	if (myprd->ldpath != NULL) 
-	{
+	producer_util *util = (producer_util *) arg;
+	int count = 0;
+	Record tmpRec;
+	
+	if (util->loadPath != NULL) {
 		//cout << "load producer" << endl;
-		FILE *tableFile = fopen(myprd->ldpath, "r");
-		while(temp.SuckNextRecord(myprd->rschema, tableFile))
-		{
-			counter += 1;
-			myprd->pipe->Insert (&temp);
+		FILE *tmpFile = fopen (util->loadPath, "r");
+
+		while (tmpRec.SuckNextRecord (util->fileSchema, tmpFile)) {
+			count += 1;
+			util->pipe->Insert (&tmpRec);
 		}
-	}
-	else
-	{
+
+	} else {
 		//cout << "Merging producer" <<  endl;
-		//cout << "Total pages: " << myprd->f->GetLength() -2 << endl;
-		int curPage =0;
+		//cout << "Total pages: " << util->f->GetLength() -2 << endl;
+		int currPageCount = 0;
 		Page p2;
-		myprd->file->GetPage(&p2,curPage);
-		while(true) {
-			if(!p2.GetFirst(&temp))
-			{
-				if(curPage < myprd->file->GetLength() -2)
-				{
-					
-					curPage++;
-					//cout << "incrementing pages: " << curPage<< endl;
-					myprd->file->GetPage(&p2,curPage);
-					if(!p2.GetFirst(&temp))
-					{
-						break;
-						//cout << "No More records to read" << endl;
-					}
-				}
-				else
-				{
-					break;
-					//cout << "End of pages: " << curPage<< endl;
-				}
+		util->file->GetPage (&p2, currPageCount);
+
+		while (true) {
+
+			if (!p2.GetFirst (&tmpRec)) {
+				if(currPageCount < util->file->GetLength () -2) {
+					currPageCount++;
+					//cout << "incrementing pages: " << currPageCount<< endl;
+					util->file->GetPage (&p2,currPageCount);
+					if (!p2.GetFirst (&tmpRec))
+						break; // No More records to read
+				
+				} else
+					break; //cout << "End of pages: " << currPageCount<< endl;
 			}
 
-		myprd->pipe->Insert (&temp);
-		counter++;
+			util->pipe->Insert (&tmpRec);
+			count++;
+
 		}
 	}
-	//cout << "Inserted records by merge prod: " << counter<< endl;
-	myprd->pipe->ShutDown ();
+	//cout << "Inserted records by merge prod: " << count<< endl;
+	util->pipe->ShutDown ();
 }
 
-void *consumer (void *arg) 
-{
+void *consumer (void *arg) {
 
-	producer_util *t = (producer_util *) arg;
-	ComparisonEngine ceng;
+	producer_util *util = (producer_util *) arg;
+	ComparisonEngine ce;
+	int count =0, currPageCount =0;
+	Page page;
 	Record rec;
-        int cnt =0;
-        Page p1;
-        int curpage =0;
-	while (t->pipe->Remove (&rec)) 
-	{
-		cnt++;
-		if (!p1.Append(&rec))
-		{
-			t->file->AddPage(&p1,curpage);
-			p1.EmptyItOut();
-			p1.Append(&rec);
-			curpage++;
+
+	while (util->pipe->Remove (&rec)) {
+		count++;
+		if (!page.Append(&rec)) {
+			util->file->AddPage (&page, currPageCount);
+			page.EmptyItOut ();
+			page.Append (&rec);
+			currPageCount++;
+
 		}
 	}
-	t->file->AddPage(&p1,curpage);
-	p1.EmptyItOut();
-}
-void SortedFile::FixDirtyFile() 
-{
-                int buffsz = 100; // pipe cache size
-                Pipe input (buffsz);
-                Pipe output (buffsz);
-                pthread_t thread_1;
-                producer_util inp = {&input, &sort_order,NULL, &f, NULL  };
-                pthread_create (&thread_1, NULL, producer, (void *)&inp);
-                pthread_t thread_2;
-                producer_util outp = {&output, &sort_order,NULL, &f, NULL };
-                pthread_create (&thread_2, NULL, consumer, (void *)&outp);
-                BigQ bq (input, output, sort_order, runlen);
-                pthread_join (thread_1, NULL);
-                pthread_join (thread_2, NULL);
-
+	util->file->AddPage (&page, currPageCount);
+	page.EmptyItOut ();
 
 }
 
-int SortedFile::Create (char *f_path, fType f_type, void *startup) 
-{
+void SortedFile::FixDirtyFile () {
+	int buffer = 100; // pipe cache size
+	Pipe input (buffer);
+	Pipe output (buffer);
 
-	fstatus.open(f_path);
-	f.Open(0,f_path);
-       	f.AddPage(&p,0);
-       	pageNumber=0;
-        status = write;
-       	pageCount=1;
-                
-return 1;
+	pthread_t thread_1;
+	producer_util inp = {&input, &sort_order,NULL, &f, NULL  };
+	pthread_create (&thread_1, NULL, producer, (void *)&inp);
+
+	pthread_t thread_2;
+	producer_util util = {&output, &sort_order,NULL, &f, NULL };
+	pthread_create (&thread_2, NULL, consumer, (void *)&util);
+
+	BigQ bq (input, output, sort_order, runlen);
+
+	pthread_join (thread_1, NULL);
+	pthread_join (thread_2, NULL);
 
 }
 
-void SortedFile::Load (Schema &f_schema, char *loadpath) 
-{
-    /*    
-        //cout << "In load function switch called to W actual mode: " << status << endl;  
-        SwitchMode(W);
-	int buffsz = 100; // pipe cache size
-        Pipe input (buffsz);
-        Pipe output (buffsz);
-        pthread_t thread_1;
-        prdutil inp = {&input, &sort_order,&f_schema, &f, loadpath  };
-        pthread_create (&thread_1, NULL, produce, (void *)&inp);
-        pthread_t thread_2;
-        prdutil outp = {&output, &sort_order,&f_schema, &f, loadpath };
-        pthread_create (&thread_2, NULL, consume, (void *)&outp);
-        BigQ bq (input, output, sort_order, runlen);
-        pthread_join (thread_1, NULL);
-        pthread_join (thread_2, NULL);
-	status=R;	
-*/
-}
+int SortedFile::Create (char *filePath, fileTypeEnum fileType, void *startup) {
 
-int SortedFile::Open(char *f_path)
-{
-	p.EmptyItOut();
-	f.Open(1,f_path);
-	status=read;
-	pageCount = f.GetLength();
-	MoveFirst();
-return 1;
-}
-
-void SortedFile::MoveFirst ()
-{
-	//cout << "In Move first function switch called to R actual mode: " << status << endl;
-	SwitchMode(read);
-	p.EmptyItOut();
+	fstatus.open (filePath);
+	f.Open (0,filePath);
+	f.AddPage (&p,0);
 	pageNumber = 0;
-	f.GetPage(&p,pageNumber);
+	fileMode = write;
+	pageCount = 1;
+                
+	return 1;
+}
+
+void SortedFile::Load (Schema &fileSchema, char *loadPath) {}
+
+int SortedFile::Open (char *filePath) {
+	p.EmptyItOut ();
+	f.Open (1, filePath);
+	fileMode = read;
+	pageCount = f.GetLength ();
+	MoveFirst ();
+
+	return 1;
+}
+
+void SortedFile::MoveFirst () {
+	//cout << "In Move first function switch called to R actual mode: " << status << endl;
+	SwitchMode (read);
+	p.EmptyItOut ();
+	pageNumber = 0;
+	f.GetPage (&p, pageNumber);
 
 }
 
-int SortedFile::Close ()
-{
+int SortedFile::Close () {
 	//cout << "In close function switch called to R actual mode: " << status << endl;
-        SwitchMode(read);
-	p.EmptyItOut();
-	f.Close();
-return 1;
+    SwitchMode (read);
+	p.EmptyItOut ();
+	f.Close ();
 
+	return 1;
 }
 
-void SortedFile::Add (Record &rec)
-{
+void SortedFile::Add (Record &rec) {
+	//cout << "In Add function switch called to W actual mode: " << status << endl;
+	SwitchMode (write);
+	if (!p.Append (&rec)) {
+		f.AddPage (&p, pageNumber);
+		p.EmptyItOut ();
+		pageCount++;
+		pageNumber++;
+		p.Append (&rec);
 
-        //cout << "In Add function switch called to W actual mode: " << status << endl;
-	SwitchMode(write);
-	if(!p.Append(&rec))
-	{
-
-		f.AddPage(&p, pageNumber);
-		p.EmptyItOut();
-		pageNumber++;pageCount++;
-		p.Append(&rec);
 	}	
 }
 
 
-
-int SortedFile::GetNext (Record &fetchme) {
+int SortedFile::GetNext (Record &fetchMe) {
 	//cout << "In get next function switch called to R actual mode: " << status << endl;
-	SwitchMode(read);
-	if(p.GetFirst(&fetchme))
-	{
+	SwitchMode (read);
+	if (p.GetFirst (&fetchMe))
 		return 1;
-	}
-	else
-	{
-		if(pageNumber < pageCount - 2)
-		{
+	else {
+		if (pageNumber < pageCount - 2) {
 			pageNumber++;
 			f.GetPage(&p,pageNumber);
-			if(GetNext(fetchme))
-			{
+			if(GetNext(fetchMe))
 				return 1;
-			}	
 		}
-	return 0;
+		return 0;
+
 	}	
 }
 
-
-int SortedFile::GetNext (Record &fetchme, CNF &cnf, Record &literal) 
-{
+int SortedFile::GetNext (Record &fetchMe, CNF &cnf, Record &literal) {
 	//cout << "In get next cnf function switch called to R actual mode: " << status << endl;
-	SwitchMode(read);
-        ComparisonEngine comp;
-	while(GetNext(fetchme)){
-		if (comp.Compare (&fetchme, &literal, &cnf))
-		{
-
+	SwitchMode (read);
+    ComparisonEngine comp;
+	while (GetNext (fetchMe)) {
+		if (comp.Compare (&fetchMe, &literal, &cnf))
 			return 1;
-		}		
 	}
+	
 	return 0;
 }

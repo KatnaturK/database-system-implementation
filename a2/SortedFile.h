@@ -1,27 +1,20 @@
 #ifndef SORTEDFILE_H
 #define SORTEDFILE_H
 
-#include "TwoWayList.h"
-#include "Record.h"
-#include "Schema.h"
-#include "File.h"
-#include "Comparison.h"
-#include "ComparisonEngine.h"
-#include "GenericDBFile.h"
-#include "Pipe.h"
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
-#include "DBFile.h"
+
+#include "GenericDBFile.h"
 
 using namespace std;
 
 typedef struct {
         Pipe *pipe;
-        OrderMaker *order;
-        Schema *rschema;
+        OrderMaker *sortOrder;
+        Schema *fileSchema;
         File *file;
-        char* ldpath;
+        char* loadPath;
 } producer_util;
 
 typedef enum {read, write} mode;
@@ -30,20 +23,20 @@ typedef enum {read, write} mode;
 class SortedFile : virtual public  GenericDBFile {
 
 public:
-
         SortedFile ();
-        mode status;
-        int Create (char *fpath, fType file_type, void *startup);
-        int Open (char *fpath);
-        int Close ();
-        void Load (Schema &myschema, char *loadpath);
-	void SwitchMode(mode new_mode);
-        void FixDirtyFile();
-        void MoveFirst ();
-        void Add (Record &addme);
-        int GetNext (Record &fetchme);
-        int GetNext (Record &fetchme, CNF &cnf, Record &literal);
-        
         ~SortedFile();
+
+        mode fileMode;
+
+        void Add (Record &rec);
+        int Close ();
+        int Create (char *filePath, fileTypeEnum fileEnum, void *startup);
+        void FixDirtyFile();
+        int GetNext (Record &fetchMe);
+        int GetNext (Record &fetchMe, CNF &cnf, Record &literal);
+        void Load (Schema &fileSchema, char *loadpath);
+        void MoveFirst ();
+        int Open (char *filePath);
+	void SwitchMode(mode nextMode);
 };
 #endif

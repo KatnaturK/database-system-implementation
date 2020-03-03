@@ -1,46 +1,46 @@
 #ifndef DBFILE_H
 #define DBFILE_H
 
-#include "TwoWayList.h"
-#include "Record.h"
-#include "Schema.h"
-#include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
+#include "Defs.h"
+#include "File.h"
 #include "GenericDBFile.h"
+#include "Pipe.h"
+#include "Record.h"
+#include "Schema.h"
+#include "TwoWayList.h"
 
-struct metadata {
+struct runStruct {
         int runlength;
-        OrderMaker sorting_order;
-        fType filetype;
+        fileTypeEnum filetype;
+        OrderMaker sortOrder;
 };
 
-struct sortinfo {
-        OrderMaker *ord;
-        int l;
+struct sortStruct {
+        OrderMaker *sortOrder;
+        int length;
 };
-
 
 class DBFile {
 
 public:
-
-        GenericDBFile* myInternalVar;
+        
+        GenericDBFile* genericDBFile;
+        
         DBFile ();
         ~DBFile();
+        
+        sortStruct *sort;
 
-        int Create (char *fpath, fType file_type, void *startup);
-        int Open (char *fpath);
-        int Close ();
-        sortinfo *mysrt;
-
-        void Load (Schema &myschema, char *loadpath);
-
-        void MoveFirst ();
         void Add (Record &addme);
+        int Close ();
+        int Create (char *filePath, fileTypeEnum fileType, void *startup);
         int GetNext (Record &fetchme);
         int GetNext (Record &fetchme, CNF &cnf, Record &literal);
-
+        void Load (Schema &myschema, char *loadpath);
+        void MoveFirst ();
+        int Open (char *filePath);
 };
 #endif
 

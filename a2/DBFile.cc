@@ -1,128 +1,111 @@
-#include "TwoWayList.h"
-#include "Record.h"
-#include "Schema.h"
-#include "File.h"
-#include "Pipe.h"
-#include "Comparison.h"
-#include "ComparisonEngine.h"
-#include "DBFile.h"
-#include "Defs.h"
 #include <fstream>
 #include <iostream>
+
+#include "DBFile.h"
 #include "HeapFile.h"
 #include "SortedFile.h"
 
 using namespace std;
 
-DBFile::DBFile (): myInternalVar(NULL) {
-
- 
-
-}
+DBFile::DBFile (): genericDBFile(NULL) {}
 
 DBFile::~DBFile () {
-
-delete myInternalVar;
-
+  delete genericDBFile;
 }
 
- int DBFile::Open (char *fpath) {
-  fType myftype;
-  string metadataFilePath=fpath;
-  metadataFilePath=metadataFilePath+".metadata";
-  fstream outputFile(metadataFilePath.c_str(), fstream::in);
-  metadata tst;
-  outputFile.read((char *) & tst, sizeof (metadata));
-  myftype = tst.filetype;
+int DBFile::Open (char *filePath) {
   
-  if (myftype == heap){
-   cout << "Trying to open Heap DBFIle";
-   myInternalVar = new HeapFile();
-   return myInternalVar->Open(fpath);
+  string tmpFilePath = filePath;
+  tmpFilePath = tmpFilePath + ".meta";
+  fstream outputFile (tmpFilePath.c_str (), fstream::in);
+  
+  runStruct run;
+  outputFile.read ((char *) & run, sizeof (runStruct));
+
+  fileTypeEnum fileType;
+  fileType = run.filetype;
+
+  if (fileType == heap) {
+    // cout << "Trying to open Heap DBFIle";
+    genericDBFile = new HeapFile ();
+    return genericDBFile->Open (filePath);
+
+  } else if (fileType == sorted) {
+    // cout << "Trying to open Sorted DBFIle";
+    genericDBFile = new SortedFile ();
+    genericDBFile->sort_order = run.sortOrder;
+    genericDBFile->runlen = run.runlength;
+    return genericDBFile->Open (filePath);
 
   }
-
-  else if (myftype == sorted){
-   cout << "Trying to open Sorted DBFIle";
-   myInternalVar = new SortedFile();
-   myInternalVar->sort_order = tst.sorting_order;
-   myInternalVar->runlen = tst.runlength;
-   return myInternalVar->Open(fpath);
-
-  }
-
-
 }
- int DBFile::Create (char *f_path, fType f_type, void *startup) {
+
+int DBFile::Create (char *filePath, fileTypeEnum fileType, void *startup) {
    
-  if (f_type == heap){
-  string metadataFilePath=f_path;
-  metadataFilePath=metadataFilePath+".metadata";
-  fstream outputFile(metadataFilePath.c_str(), fstream::out);
-  metadata myMeta;
-  myMeta.filetype = heap;
-  outputFile.write((char *) &myMeta, sizeof(myMeta));
-  outputFile.close();
-  myInternalVar = new HeapFile();
-  return  myInternalVar->Create(f_path, f_type, startup);
+  if (fileType == heap) {
+
+    string tmpFilePath = filePath;
+    tmpFilePath = tmpFilePath + ".meta";
+    fstream outputFile(tmpFilePath.c_str(), fstream::out);
+
+    runStruct run;
+    run.filetype = heap;
+    outputFile.write((char *) &run, sizeof(run));
+    outputFile.close();
+
+    genericDBFile = new HeapFile();
+    return  genericDBFile->Create(filePath, fileType, startup);
+
+  } else if (fileType == sorted) {
+
+    //cout << "Trying to create DBFile" << endl;
+    runStruct run;
+    run.filetype = sorted;
+    sort =(sortStruct*)startup;
+    
+    //cout << "Startup coded" << endl;
+    //cout << "Sorting order taken" << endl;
+    run.sortOrder = *(OrderMaker *)(sort->sortOrder);
+    run.runlength = sort->length;   
+
+    //cout << "trying to write" << endl;
+    string tmpFilePath = filePath;
+    tmpFilePath = tmpFilePath + ".meta";
+    fstream outputFile(tmpFilePath.c_str(), fstream::out);
+    outputFile.write((char *) &run, sizeof(runStruct));
+    // cout << "Metadata written" << endl;
+    outputFile.close();
+
+    // cout << "saving into myvar" << endl;
+    genericDBFile = new SortedFile(); 
+    genericDBFile->sort_order = *(sort->sortOrder);
+    genericDBFile->runlen = sort->length;
+
+    // cout << "Sending to Sorted File" << endl;
+    return genericDBFile->Create(filePath, fileType, startup);
   }
-
-else if (f_type == sorted){
-  metadata myMeta;
-  //cout << "Trying to create DBFile" << endl;
-  myMeta.filetype = sorted;
-  //cout << "Statement run" << endl;
-  mysrt =(sortinfo*)startup;
-  
-  //cout << "Startup coded" << endl;
-  //cout << "printing l: " << &(mysrt->l) << endl;
-  //mysrt->ord->Print();
-  myMeta.sorting_order = *(OrderMaker *)(mysrt->ord);
- //cout << "Sorting order taken" << endl;
-  myMeta.runlength = mysrt->l;   
-  //cout << "trying to write" << endl;
-  string metadataFilePath=f_path;
-  metadataFilePath=metadataFilePath+".metadata";
-  fstream outputFile(metadataFilePath.c_str(), fstream::out);
-  outputFile.write((char *) &myMeta, sizeof(metadata));
-  cout << "Metadata written" << endl;
-  outputFile.close();
-  cout << "saving into myvar" << endl;
-  myInternalVar = new SortedFile(); 
-  myInternalVar->sort_order = *(mysrt->ord);
-  myInternalVar->runlen = mysrt->l;
-
-  cout << "Sending to Sorted File" << endl;
-  return myInternalVar->Create(f_path, f_type, startup);
 }
 
-}
-void DBFile::Load (Schema &f_schema, char *loadpath) {
-  myInternalVar->Load(f_schema,loadpath);
+void DBFile::Load (Schema &fileSchema, char *loadPath) {
+  genericDBFile->Load (fileSchema,loadPath);
 }
 
-void DBFile::MoveFirst () 
- {
-    myInternalVar->MoveFirst();
+void DBFile::MoveFirst () {
+    genericDBFile->MoveFirst ();
+}
+
+ int DBFile::Close () {
+   return genericDBFile->Close ();
  }
 
- int DBFile::Close () 
- {
-   return myInternalVar->Close();
- }
-
-void DBFile::Add (Record &rec) 
-{
-
-  myInternalVar->Add(rec);
+void DBFile::Add (Record &rec) {
+  genericDBFile->Add (rec);
 }
 
-int DBFile::GetNext (Record &fetchme) 
-{
-  return myInternalVar->GetNext(fetchme);
+int DBFile::GetNext (Record &fetchMe) {
+  return genericDBFile->GetNext (fetchMe);
 }
 
-int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal) {
-
-  return myInternalVar->GetNext(fetchme,cnf,literal);
+int DBFile::GetNext (Record &fetchMe, CNF &cnf, Record &literal) {
+  return genericDBFile->GetNext (fetchMe, cnf, literal);
 }
