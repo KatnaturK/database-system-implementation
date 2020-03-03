@@ -1,65 +1,71 @@
 #ifndef BIGQ_H
 #define BIGQ_H
-#include <pthread.h>
-#include <iostream>
-#include "Pipe.h"
-#include "File.h"
-#include "Record.h"
-#include <vector>
-#include <string>
+
 #include <algorithm>
+#include <iostream>
+#include <pthread.h>
+#include<set>
+#include <string>
+#include <vector>
+
+#include "File.h"
+#include "Pipe.h"
+#include "Record.h"
+
 using namespace std;
 
-class recordsW {
+class RecordOperator {
+
 public:
-
-        Record newRecord;
-        int runPosition;
-        OrderMaker *sortedOrder;
-
-};
-
-
-class recordsW1 {
-public:
-        static int compareRecords(const void *rc1, const void *rc2);
+        static int compareRecords (const void *rc1, const void *rc2);
         Record tmpRecord;
         OrderMaker *sortedOrder;
 };
 
-class runmetaData {
+class CustomRecord {
+
 public:
-int startPage, endPage;
+        Record newRecord;
+        int runPosition;
+        OrderMaker *sortedOrder;
+};
+
+class CustomPage {
+
+public:
+        Page page; 
+        int currentPageNum; 
+};
+
+class RunPage {
+
+public:
+        int startPageNum;
+        int endPageNum;
 };
 
 class BigQ {
 
-Pipe *inputPipe, *outputPipe;
-OrderMaker *sortingOrder;
-int runLength;
+        Pipe *in, *out;
+        OrderMaker *sortOrder;
+        int runLength;
 
 public:
-
-
-       static void* sortingWorker(void* threadid);
-
-
-        void writeInFile(vector<recordsW1*> rcVector);
-        void sortRecords();
-        void mergeRecords();
-        vector<pair<int,int> > pageBegin;
-        vector<runmetaData*> runmetaDataVec;
-         
-        File sortedFile;
-        char *fileName;
-        int currentPageNum, numberRuns;
-	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);
+        BigQ (Pipe &in, Pipe &out, OrderMaker &sortOrder, int runlen);
 	~BigQ ();
-};
 
-class pageWrap {
-public:
-Page newPage; 
-int currentPage; 
+        char *tmpRunFile;
+        File runFile;
+        int currentPageNum;
+        int runCount;
+        vector<pair<int,int> > pages;
+        vector<RunPage*> runPages;
+
+        static void* worker (void* worker);
+        
+        void tmpmmsPhase1 ();
+        void tmpmmsPhase2 ();
+        void generateRuns (vector<RecordOperator*> records);
+	
 };
 #endif
