@@ -117,47 +117,6 @@ void OrderMaker :: Print () {
 	}
 }
 
-std::ostream& operator<<(std::ostream& os, const OrderMaker& o) {
-	os << o.numAtts << "\n";
-	for (int i = 0; i < o.numAtts; ++i)
-	{
-		os << o.whichAtts[i]<<" ";
-	}
-	os << "\n";
-	for (int i = 0; i < o.numAtts; ++i)
-	{
-		os << o.whichTypes[i]<<" ";
-	}
-	os << "\n";
-	return os;
-}
-
-std::istream& operator>>(std::istream& is, OrderMaker& o) {
-	is >> o.numAtts;
-	std::cout << o.numAtts << endl;
-	for (int i = 0; i < o.numAtts; ++i)
-	{
-		is >> o.whichAtts[i];
-	}
-	int temp = 0;
-	for (int i = 0; i < o.numAtts; ++i)
-	{
-		is >> temp;
-		switch (temp) {
-			case Int:
-				o.whichTypes[i] = Int;
-				break;
-			case String:
-				o.whichTypes[i] = String;
-				break;
-			case Double:
-				o.whichTypes[i] = Double;
-				break;
-		}
-	}
-	return is;
-}
-
 
 
 int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
@@ -173,18 +132,18 @@ int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 		// if we don't have a disjunction of length one, then it
 		// can't be acceptable for use with a sort ordering
 		if (orLens[i] != 1) {
-			continue;
+			//continue;
 		}
 
 		// made it this far, so first verify that it is an equality check
 		if (orList[i][0].op != Equals) {
-			continue;
+			//continue;
 		}
 
 		// now verify that it operates over atts from both tables
 		if (!((orList[i][0].operand1 == Left && orList[i][0].operand2 == Right) ||
 		      (orList[i][0].operand2 == Left && orList[i][0].operand1 == Right))) {
-			// continue;		
+		//	continue;		
 		}
 
 		// since we are here, we have found a join attribute!!!

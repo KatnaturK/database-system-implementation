@@ -1,145 +1,128 @@
-#include <cstdlib>
-#include <cstring>
-#include <fstream>
-#include <iostream>
-
 #include "TwoWayList.h"
 #include "Record.h"
 #include "Schema.h"
 #include "File.h"
+#include "Pipe.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
 #include "DBFile.h"
 #include "Defs.h"
+#include <fstream>
+#include <iostream>
+#include "HeapFile.h"
+#include "SortedFile.h"
 
-DBFile::DBFile () {
+using namespace std;
+
+DBFile::DBFile (): myInternalVar(NULL) {
+
+ 
+
 }
 
 DBFile::~DBFile () {
+
+delete myInternalVar;
+
 }
 
-int DBFile::Create (const char *fpath, fType file_type, void *startup) {
-    ofstream metafile;
-    char *metafilename = GetMetafileName(fpath);
-    metafile.open(metafilename);
+ int DBFile::Open (char *fpath) {
+  fType myftype;
+  string metadataFilePath=fpath;
+  metadataFilePath=metadataFilePath+".metadata";
+  fstream outputFile(metadataFilePath.c_str(), fstream::in);
+  metadata tst;
+  outputFile.read((char *) & tst, sizeof (metadata));
+  myftype = tst.filetype;
+  
+  if (myftype == heap){
+   cout << "Trying to open Heap DBFIle";
+   myInternalVar = new HeapFile();
+   return myInternalVar->Open(fpath);
 
-    switch(file_type) {
-        case heap:
-            metafile << "heap\n";
-            internalDBFile = new HeapFile();
-            metafile.close();
-            return internalDBFile->Create(fpath, heap, NULL);
+  }
 
-        case sorted:
-            metafile << "sorted\n";
-            {
-                SortInfo sortinfo = *(SortInfo *) startup;
-                OrderMaker *o = sortinfo.myOrder;
-                // memset(o, 0, sizeof(OrderMaker));
+  else if (myftype == sorted){
+   cout << "Trying to open Sorted DBFIle";
+   myInternalVar = new SortedFile();
+   myInternalVar->sort_order = tst.sorting_order;
+   myInternalVar->runlen = tst.runlength;
+   return myInternalVar->Open(fpath);
 
-                metafile << sortinfo.runlength << "\n";
-                metafile << *o;
-                internalDBFile = new SortedFile(sortinfo.runlength, sortinfo.myOrder);   
-            }
-            return internalDBFile->Create(fpath, sorted, startup);
+  }
 
-        case tree:
-            break;
-        default:
-            std::cerr << "Incorrect file type\n";
-    }
-    return 0;
+
+}
+ int DBFile::Create (char *f_path, fType f_type, void *startup) {
+   
+  if (f_type == heap){
+  string metadataFilePath=f_path;
+  metadataFilePath=metadataFilePath+".metadata";
+  fstream outputFile(metadataFilePath.c_str(), fstream::out);
+  metadata myMeta;
+  myMeta.filetype = heap;
+  outputFile.write((char *) &myMeta, sizeof(myMeta));
+  outputFile.close();
+  myInternalVar = new HeapFile();
+  return  myInternalVar->Create(f_path, f_type, startup);
+  }
+
+else if (f_type == sorted){
+  metadata myMeta;
+  //cout << "Trying to create DBFile" << endl;
+  myMeta.filetype = sorted;
+  //cout << "Statement run" << endl;
+  mysrt =(strtup*)startup;
+  
+  //cout << "Startup coded" << endl;
+  //cout << "printing l: " << &(mysrt->l) << endl;
+  //mysrt->ord->Print();
+  myMeta.sorting_order = *(OrderMaker *)(mysrt->ord);
+ //cout << "Sorting order taken" << endl;
+  myMeta.runlength = mysrt->l;   
+  //cout << "trying to write" << endl;
+  string metadataFilePath=f_path;
+  metadataFilePath=metadataFilePath+".metadata";
+  fstream outputFile(metadataFilePath.c_str(), fstream::out);
+  outputFile.write((char *) &myMeta, sizeof(metadata));
+  cout << "Metadata written" << endl;
+  outputFile.close();
+  cout << "saving into myvar" << endl;
+  myInternalVar = new SortedFile(); 
+  myInternalVar->sort_order = *(mysrt->ord);
+  myInternalVar->runlen = mysrt->l;
+
+  cout << "Sending to Sorted File" << endl;
+  return myInternalVar->Create(f_path, f_type, startup);
 }
 
-int DBFile::Open (const char *fpath) {
-    fType ftype = GetTypeFromMetafile(fpath);
-    switch (ftype) {
-        case heap:
-            internalDBFile = new HeapFile();
-            break;
-        case sorted:
-        {
-            int runlength = GetRunlengthFromMetafile(fpath);
-            OrderMaker *sort_order = GetSortOrderFromMetafile(fpath);
-            internalDBFile = new SortedFile(runlength, sort_order);
-        }
-            break;
-        case tree:
-            break;
-        default:
-            std::cerr << "Incorrect file type\n";
-            return 0;
-    }
-    return internalDBFile->Open(fpath);
+}
+void DBFile::Load (Schema &f_schema, char *loadpath) {
+  myInternalVar->Load(f_schema,loadpath);
 }
 
-int DBFile::Close () {
-    return internalDBFile->Close();
+void DBFile::MoveFirst () 
+ {
+    myInternalVar->MoveFirst();
+ }
+
+ int DBFile::Close () 
+ {
+   return myInternalVar->Close();
+ }
+
+void DBFile::Add (Record &rec) 
+{
+
+  myInternalVar->Add(rec);
 }
 
-void DBFile::Load (Schema &myschema, const char *loadpath) {
-    internalDBFile->Load(myschema, loadpath);
-}
-
-void DBFile::MoveFirst () {
-    internalDBFile->MoveFirst();
-}
-
-void DBFile::Add (Record &addme) {
-    internalDBFile->Add(addme);
-}
-
-int DBFile::GetNext (Record &fetchme) {
-    return internalDBFile->GetNext(fetchme);
+int DBFile::GetNext (Record &fetchme) 
+{
+  return myInternalVar->GetNext(fetchme);
 }
 
 int DBFile::GetNext (Record &fetchme, CNF &cnf, Record &literal) {
-    return internalDBFile->GetNext(fetchme, cnf, literal);
-}
 
-char* DBFile::GetMetafileName (const char *fpath) {
-    char *metafilename = (char *) malloc(strlen(fpath) + strlen(".meta") + 1);
-    strcpy(metafilename, fpath);
-    strcat(metafilename, ".meta");
-    return metafilename;
-}
-
-fType DBFile::GetTypeFromMetafile (const char *fpath) {
-    ifstream metafile(GetMetafileName(fpath));
-    string line;
-    if (metafile.good()) {
-        getline(metafile, line);
-    }
-    metafile.close();
-    if (line == "heap") return heap;
-    if (line == "sorted") return sorted;
-    if (line == "tree") return tree;
-    std::cout << line;
-    std::cerr << "Something's wrong with metafile!!\n"; 
-    return heap; 
-}
-
-int DBFile::GetRunlengthFromMetafile (const char *fpath) {
-    ifstream metafile(GetMetafileName(fpath));
-    string line;
-    int runlength = 0;
-    if (metafile.good()) {
-        getline(metafile, line);
-        metafile >> runlength;
-    }
-    metafile.close();
-    return runlength;
-}
-
-OrderMaker* DBFile::GetSortOrderFromMetafile (const char *fpath) {
-    ifstream metafile(GetMetafileName(fpath));
-    OrderMaker *sort_order = new OrderMaker();
-    string line;
-    if (metafile.good()) {
-        getline(metafile, line);
-        getline(metafile, line);
-    }
-    metafile >> (*sort_order);
-    metafile.close();
-    return sort_order;   
+  return myInternalVar->GetNext(fetchme,cnf,literal);
 }

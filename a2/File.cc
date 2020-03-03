@@ -3,11 +3,11 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
 #include <iostream>
 #include <stdlib.h>
+#include <unistd.h>
 
 
 
@@ -63,10 +63,6 @@ int Page :: GetFirst (Record *firstOne) {
 	return 1;
 }
 
-int Page :: GetLength () {
-	return numRecs;
-}
-
 
 int Page :: Append (Record *addMe) {
 	char *b = addMe->GetBits();
@@ -107,7 +103,6 @@ void Page :: ToBinary (char *bits) {
 		// and traverse the list
 		myRecs->Advance ();
 	}
-	std::cout << bits;
 }
 
 
@@ -203,8 +198,6 @@ void File :: AddPage (Page *addMe, off_t whichPage) {
 	// if we are trying to add past the end of the file, then
 	// zero all of the pages out
 	if (whichPage >= curLength) {
-
-		std::cout << "ZEROING ?? " << whichPage << " " << curLength << "\n";
 		
 		// do the zeroing
 		for (off_t i = curLength; i < whichPage; i++) {
@@ -225,19 +218,7 @@ void File :: AddPage (Page *addMe, off_t whichPage) {
 		exit(1);
 	}
 
-	// DEBUG
-	char *catalog_path = "catalog";
-	char *region = "region";
-	Schema schema (catalog_path, region);
-
-	Record rec;
-	addMe->GetFirst(&rec);
-	rec.Print(&schema);
-	
 	addMe->ToBinary (bits);
-
-	std::cout << "PAGE LEn " << addMe->GetLength() << "\n";
-	std::cout << "BITS " << bits << "\n";
 	lseek (myFilDes, PAGE_SIZE * whichPage, SEEK_SET);
 	write (myFilDes, bits, PAGE_SIZE);
 	delete [] bits;

@@ -1,21 +1,21 @@
 #ifndef TEST_H
 #define TEST_H
 #include <stdio.h>
-#include <iostream>
 #include <stdlib.h>
+#include <iostream>
+#include <math.h>
+
 #include "Pipe.h"
 #include "DBFile.h"
 #include "Record.h"
-
 using namespace std;
 
 // make sure that the information below is correct
 
 char *catalog_path = "catalog"; 
-// char *tpch_dir ="/cise/tmp/dbi_sp11/DATA/10M/"; // dir where dbgen tpch files (extension *.tbl) can be found
-char *tpch_dir ="../tpch-dbgen/"; // dir where dbgen tpch files (extension *.tbl) can be found
-// char *dbfile_dir = ""; 
-char *dbfile_dir = "../dbfiles/";
+char *dbfile_dir = "../dbfiles/"; 
+char *tpch_dir ="../tpch-dbgen/"; 
+
 
 extern "C" {
 	int yyparse(void);   // defined in y.tab.c

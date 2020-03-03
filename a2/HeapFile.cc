@@ -1,120 +1,196 @@
-#include <cstdlib>
-#include <cstring>
-#include <fstream>
-#include <iostream>
-
 #include "TwoWayList.h"
 #include "Record.h"
 #include "Schema.h"
 #include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
-#include "DBFile.h"
+#include "HeapFile.h"
 #include "Defs.h"
+#include <fstream>
+#include <iostream>
 
+using namespace std;
 
-void DBFile::HeapFile::AddDeltaPageToFile() {
-    if (deltapage->GetLength()) {
-        heapfile->AddPage(deltapage, heapfile->GetLength());
-        deltapage->EmptyItOut();
+HeapFile::HeapFile () {
+
+int pageCount=0;
+pageNumber=0;
+pageInRead=true;
+pageInWrite=false;
+pageCount=0;
+
+}
+
+HeapFile::~HeapFile () {
+
+}
+ int HeapFile::Create (char *f_path, fType f_type, void *startup) {
+ 
+  fstatus.open(f_path);
+   if (fstatus.is_open())
+       {
+         f.Open(1,f_path);
+         pageInWrite=true;
+       } 
+   else
+       {
+        f.Open(0,f_path);
+        f.AddPage(&p,0);
+        pageInWrite=true;
+        pageNumber=0;
+        pageCount=1;
+       }
+
+   return 1;
+  }
+
+ void HeapFile::Load (Schema &f_schema, char *loadpath) {
+   Record tst;
+   tableFile = fopen(loadpath, "r");
+   int rcrdcntr=0;
+      if (!tableFile) 
+      {
+       cerr << "\n Failed to open the file: " << loadpath << endl;
+       return;
+      }
+
+   while(tst.SuckNextRecord(&f_schema, tableFile)) 
+   {
+     Add(tst);
+     rcrdcntr++;
     }
-}
 
-bool DBFile::HeapFile::fileExists(const char *filePath) {
-    std::ifstream ifile(filePath);
-    return (bool)ifile;
-}
+  }
 
-DBFile::HeapFile::HeapFile () {
-    heapfile = new (std::nothrow) File();
-    deltapage = new (std::nothrow) Page();
-    readpage = new (std::nothrow) Page();
-    filename = NULL;
-    readPageNumber = -1;
-}
-
-DBFile::HeapFile::~HeapFile () {
-    delete heapfile;
-    delete deltapage;
-    delete readpage;
-    delete filename;
-}
-
-int DBFile::HeapFile::Create (const char *fpath, fType f_type, void *startup) {
-    char *filename = strdup(fpath);
-    if (filename != NULL) {
-        strcpy(filename, fpath);
-        heapfile->Open(0, filename);
-        return 1;
+ int HeapFile::Open(char *f_path) {
+  fstatus.open(f_path);
+ if (fstatus.is_open())
+    {
+      f.Open(1,f_path);
     }
-    return 0;   // out of memory return value;
-}
-
-void DBFile::HeapFile::Load (Schema &f_schema, const char *loadpath) {
-    Record rec;
-    FILE *file = fopen(loadpath, "r");
-    while (rec.SuckNextRecord(&f_schema, file)) {
-        this->Add(rec);
+ else
+    {
+     f.Open(0,f_path);
     }
+
+pageInRead=true;
+pageCount=f.GetLength();
+MoveFirst();
+
+return 1;
+
 }
 
-int DBFile::HeapFile::Open (const char *f_path) {
-    if( !fileExists(f_path) ) return 0;
-    char *filename = strdup(f_path);
-    if (filename != NULL) {
-        strcpy(filename, f_path);
-        heapfile->Open(1, filename);
-        return 1;
+void HeapFile::MoveFirst () 
+ {
+  if (f.GetLength() ==0) 
+  {
+   cerr << "DB-000: Invalid Operation ! Empty File !! " ;
+  }
+  else 
+  {   
+    if (pageInWrite)
+     {
+      f.AddPage(&p,pageNumber);
+      p.EmptyItOut();
+      pageNumber=0;
+      f.GetPage(&p, pageNumber);
+      pageInWrite=false;
+      }
+
+     else
+     {
+      p.EmptyItOut();
+      pageNumber=0;
+      f.GetPage(&p, pageNumber);
+     }
+
+  }
+ }
+
+ int HeapFile::Close () 
+ {
+   if (pageInWrite)
+   {
+    f.AddPage(&p,pageNumber);
+    pageInWrite=false;
+   }
+   p.EmptyItOut();
+   if (f.Close() >= 0) {
+     return 1;
     }
-    return 0;
-}
-
-void DBFile::HeapFile::MoveFirst () {
-    readPageNumber = -1;
-    readpage->EmptyItOut();
-}
-
-// closes the file and returns the file length (in number of pages)
-int DBFile::HeapFile::Close () {
-    AddDeltaPageToFile();
-    return heapfile->Close();
-}
-
-void DBFile::HeapFile::Add (Record &rec) {
-    // printf("num records %d\n", deltapage->GetLength());
-    int samepage = deltapage->Append(&rec);
-    // printf("samepage %d\n", samepage);
-    if (!samepage) {
-        AddDeltaPageToFile();
-        deltapage->Append(&rec);
+    else 
+    {
+     return 0;
     }
-}
+ }
 
-int DBFile::HeapFile::GetNext (Record &fetchme) {
-    if (readpage->GetFirst(&fetchme) == 0) {
-        if (readPageNumber <= heapfile->GetLength() - 3) {
-            heapfile->GetPage(readpage, ++readPageNumber);
-        }
-        else {
-            if (deltapage->GetLength()) {
-                AddDeltaPageToFile();
-                heapfile->GetPage(readpage, ++readPageNumber);
-            }
-            else
-                return 0;
-        }
-        readpage->GetFirst(&fetchme);
+void HeapFile::Add (Record &rec) 
+{
+
+ if (pageInRead)
+  {
+     p.EmptyItOut();
+     pageNumber = f.GetLength()-2;
+     f.GetPage(&p,f.GetLength()-2);
+     pageInRead = false;
+     pageInWrite= true;
+  }
+
+ if(!p.Append(&rec))
+  {
+   f.AddPage(&p,pageNumber);
+   p.EmptyItOut();
+   pageNumber++; pageCount++;
+   p.Append(&rec);
+    
+  }
+ }
+
+int HeapFile::GetNext (Record &fetchme) 
+ {
+  if(pageInWrite) 
+  {
+    f.AddPage(&p, pageNumber);
+    pageInWrite = false;
+    pageInRead=true;
     }
+  if(p.GetFirst(&fetchme)) 
+  {
     return 1;
+  }
+  else{
+    if(pageNumber++ < f.GetLength()-2)
+     {
+       f.GetPage(&p, pageNumber);
+        if (p.GetFirst(&fetchme)) 
+        {
+          return 1;
+        }
+     }
+    else
+    {
+      return 0;
+    }
+  }
 }
 
-int DBFile::HeapFile::GetNext (Record &fetchme, CNF &cnf, Record &literal) {
-    Record rec;
-    while (GetNext(rec)) {
-        if (comp.Compare(&rec, &literal, &cnf)) {
-            fetchme.Consume(&rec);
-            return 1;
-        }
+int HeapFile::GetNext (Record &fetchme, CNF &cnf, Record &literal) {
+
+
+ if(pageInWrite) 
+ {
+   f.AddPage(&p, pageNumber);
+   pageInWrite = false;
+   pageInRead=true;
+  }
+
+  while (GetNext(fetchme)) 
+  {
+    if (comp.Compare(&fetchme, &literal, &cnf)) 
+    {
+      return 1;
     }
-    return 0;
-}
+  }
+ return 0;
+ }

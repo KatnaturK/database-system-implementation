@@ -1,81 +1,65 @@
 #ifndef BIGQ_H
 #define BIGQ_H
-#include <algorithm>
+#include <pthread.h>
 #include <iostream>
-#include <map>
-#include <math.h>
-#include <stdlib.h>
-#include <queue>
-#include <vector>
-
-#include "ComparisonEngine.h"
-#include "File.h"
 #include "Pipe.h"
+#include "File.h"
 #include "Record.h"
-
+#include <vector>
+#include <string>
+#include <algorithm>
 using namespace std;
 
-class ComparisonEngine;
-
-class Phase1Compare{
-
-OrderMaker *sortOrder;
-
+class recordsW {
 public:
 
-	Phase1Compare(OrderMaker *inSortOrder) {
-		sortOrder = inSortOrder;
-	}
+        Record newRecord;
+        int runPosition;
+        OrderMaker *sortedOrder;
 
-	// compare operator to sort records into runs for phase 1 of tpmms algorithm.
-	bool operator()(Record* record1, Record* record2) {
-		ComparisonEngine ce;
-		if (ce.Compare (record1, record2, sortOrder) < 0) return true;
-		else return false;
-	}
 };
 
-class Phase2Compare{
 
-	OrderMaker *sortOrder;
-
+class recordsW1 {
 public:
-
-	Phase2Compare(OrderMaker *inSortOrder) {
-		sortOrder = inSortOrder;
-	}
-
-	// compare operator to sort records and merge using priority queue for phase 2 of tpmms algorithm.
-	bool operator()(Record* record1, Record* record2) {
-		ComparisonEngine ce;
-		if (ce.Compare (record1, record2, sortOrder) < 0) return false;
-		else return true;
-	}
+        static int compareRecords(const void *rc1, const void *rc2);
+        Record tmpRecord;
+        OrderMaker *sortedOrder;
 };
 
-class BigQ  {
+class runmetaData {
+public:
+int startPage, endPage;
+};
+
+class BigQ {
+
+Pipe *inputPipe, *outputPipe;
+OrderMaker *sortingOrder;
+int runLength;
 
 public:
 
-	int runLength;
-	File runFile;
-	OrderMaker *sortOrder;
-	Pipe *in, *out;
-	
-	BigQ ();
+
+       static void* sortingWorker(void* threadid);
+
+
+        void writeInFile(vector<recordsW1*> rcVector);
+        void sortRecords();
+        void mergeRecords();
+        vector<pair<int,int> > pageBegin;
+        vector<runmetaData*> runmetaDataVec;
+         
+        File sortedFile;
+        char *fileName;
+        int currentPageNum, numberRuns;
 	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);
 	~BigQ ();
-
-	static void* worker(void* workerThread);
-
-	// Phase 1 of Two-Pass Multiway Merge Sort Algorithm.
-	void tpmmsPhase1 (Pipe *in, OrderMaker *sortOrder, int &runCount, int runLength, File &runFile,	map<int,Page*> &overflow);
-	// Phase 2 of Two-Pass Multiway Merge Sort Algorithm.
-	void tpmmsPhase2 (Pipe *out, OrderMaker *sortOrder, int runCount, int runLength, File &runFile, map<int,Page*> overflow);
-
-	void initFile (File &runfile);
-	int generateRuns (vector<Record *> &records, int &runCount, int runLength, File &runFile, map<int,Page*> &overflow);
-
 };
 
+class pageWrap {
+public:
+Page newPage; 
+int currentPage; 
+};
 #endif
