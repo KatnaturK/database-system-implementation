@@ -2,34 +2,31 @@
 #include "DBFile.h"
 #include "test.h"
 
-TEST(DBFileTest, Create_Equal) {
+int runlength = 4;
+OrderMaker sortOrder;
+
+TEST(DBFileTest, Heap_Create_Equal) {
     DBFile dbfile;
     ASSERT_EQ(1, dbfile.Create( n->path(), heap, NULL));
 }
 
-TEST(DBFileTest, Create_NotEqual) {
+TEST(DBFileTest, Heap_Create_NotEqual) {
     DBFile dbfile;
     EXPECT_EXIT( dbfile.Create( "", heap, NULL), ::testing::ExitedWithCode(1), "BAD!  Open did not work for.*");
-    ASSERT_EQ( 0, dbfile.Create( n->path(), sorted, NULL));
 }
 
-TEST(DBFileTest, Open_Equal) {
+TEST(DBFileTest, Heap_Open_Equal) {
     DBFile dbfile;
     ASSERT_EQ(1, dbfile.Open( n->path()) );
 }
 
-TEST(DBFileTest, Open_NotEqual) {
-    DBFile dbfile;
-    ASSERT_EQ(0, dbfile.Open("dbfiles/random_file.bin"));
-}
-
-TEST(DBFileTest, Close_Empty_File) {
+TEST(DBFileTest, Heap_Close_Empty_File) {
     DBFile dbfile;
     dbfile.Create( n->path(), heap, NULL);
-    ASSERT_EQ(0, dbfile.Close());
+    ASSERT_EQ(1, dbfile.Close());
 }
 
-TEST(DBFileTest, Close_Nations_DBFile) {
+TEST(DBFileTest, Heap_Close_Nations_DBFile) {
     DBFile dbfile;
     dbfile.Create( n->path(), heap, NULL);
     char tbl_path[100]; // construct path of the tpch flat text file
@@ -38,28 +35,45 @@ TEST(DBFileTest, Close_Nations_DBFile) {
     ASSERT_TRUE( dbfile.Close() != 0);
 }
 
-// void loadFile(relation currRel) {
-//     DBFile dbfile;
-//     char tbl_path[100];
-//     ASSERT_EQ(1, dbfile.Create( currRel.path(), heap, NULL));
-//     sprintf (tbl_path, "%s%s.tbl", tpch_dir, currRel.name()); 
-//     dbfile.Load (*(currRel.schema ()), tbl_path);
-//     ASSERT_EQ(1, dbfile.Open( currRel.path()) );
-// }
+TEST(DBFileTest, Sorted_Create_Equal) {
+    DBFile dbfile;
+    sortStruct startup = {&sortOrder, runlength};
+    ASSERT_EQ(1, dbfile.Create( n->path(), sorted, &startup));
+}
 
-// TEST(DBFileTest, Load_Equal) {
-//     loadFile(*c);
-//     loadFile(*li);
-//     loadFile(*o);
-//     // loadFile(*n);
-//     loadFile(*p);
-//     loadFile(*ps);
-//     loadFile(*r);
-//     loadFile(*s);
-// }
+TEST(DBFileTest, Sorted_Create_NotEqual) {
+    DBFile dbfile;
+    sortStruct startup = {&sortOrder, runlength};
+    EXPECT_EXIT( dbfile.Create( "", sorted, &startup), ::testing::ExitedWithCode(1), "BAD!  Open did not work for.*");
+    ASSERT_EQ( 1, dbfile.Create( n->path(), sorted, &startup));
+}
+
+TEST(DBFileTest, Sorted_Open_Equal) {
+    DBFile dbfile;
+    ASSERT_EQ(1, dbfile.Open( r->path()) );
+}
+
+
+TEST(DBFileTest, Sorted_Close_Empty_File) {
+    DBFile dbfile;
+    sortStruct startup = {&sortOrder, runlength};
+    dbfile.Create( n->path(), sorted, &startup);
+    ASSERT_EQ(1, dbfile.Close());
+}
+
+TEST(DBFileTest, Sorted_Close_Nations_DBFile) {
+    DBFile dbfile;
+    sortStruct startup = {&sortOrder, runlength};
+    dbfile.Create( n->path(), sorted, &startup);
+    char tbl_path[100]; // construct path of the tpch flat text file
+    sprintf (tbl_path, "%s%s.tbl", tpch_dir, n->name()); 
+    dbfile.Load (*(n->schema ()), tbl_path);
+    ASSERT_TRUE( dbfile.Close() != 0);
+}
 
 int main(int argc, char **argv) {
     setup ();
+    n->get_sort_order (sortOrder);
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

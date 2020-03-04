@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./bigQTest.out < gtc1.txt
+./dBFileTest.out < gtc1.txt

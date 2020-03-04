@@ -13,8 +13,8 @@ test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o Generi
 a1test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o a1-test.o
 	$(CC) -o a1test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o a1-test.o -lfl
 
-dBFileTest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o
-	$(CC) -o dBFileTest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o -lfl -lpthread -lgtest
+dBFileTest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o
+	$(CC) -o dBFileTest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o DBFileTest.o -lfl -lpthread -lgtest
 
 bigQTest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o BigQTest.o
 	$(CC) -o bigQTest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o BigQTest.o -lfl -lpthread -lgtest
