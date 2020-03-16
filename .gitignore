@@ -5,6 +5,9 @@ a*/*.out
 dbfiles/
 tpch-dbgen/
 
+# Valgrind files #
+*vgcore*
+
 # Editors #
 ###########
 .vscode
