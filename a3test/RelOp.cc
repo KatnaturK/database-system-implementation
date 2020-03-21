@@ -2,10 +2,12 @@
 #include <iostream>
 
 void SelectFile::Run (DBFile &inFile, Pipe &outPipe, CNF &selOp, Record &literal) {
-    cout << "inside run\n";
-    select_file_struct s = {&inFile, &outPipe, &selOp, &literal};
-    int ret = pthread_create(&thread, NULL, select_file_function, (void*) &s);
-    cout << "thread created\n";
+    this->inFile = &inFile;
+    this->outPipe = &outPipe;
+    this->selOp = &selOp;
+    this->literal = &literal;
+    this->buffer = new Record;
+    pthread_create(&thread, NULL, select_file_helper, (void*)this);
 }
 
 void SelectFile::WaitUntilDone () {
@@ -13,19 +15,22 @@ void SelectFile::WaitUntilDone () {
 }
 
 void SelectFile::Use_n_Pages (int runlen) {
-
+    // only one temp record being used (no pages)
+    return;
 }
 
-void* SelectFile::select_file_function (void* s) {
-    cout << "inside select_file_function\n";
-    select_file_struct *s1 = (select_file_struct *)s;
-    // CNF selOp = s1->selOp;
-    Record literal = *(s1->literal);
-    Record currRecord;
-    while (s1->inFile->GetNext(currRecord, *(s1->selOp), literal)) {
-        cout << "got a record?\n";
-        s1->outPipe->Insert(&currRecord);
-    }
-    cout << "got noo records?\n";
-    s1->outPipe->ShutDown();
+void* SelectFile::select_file_helper (void* arg) {
+    SelectFile *s = (SelectFile *)arg;
+    s->select_file_function();
+}
+
+void* SelectFile::select_file_function () {
+    ComparisonEngine ce;
+    inFile->MoveFirst();
+
+    while (inFile->GetNext(*buffer, *selOp, *literal))
+        outPipe->Insert(buffer);
+
+    outPipe->ShutDown();
+    pthread_exit(NULL);
 }

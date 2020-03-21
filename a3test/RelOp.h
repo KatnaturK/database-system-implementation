@@ -6,12 +6,6 @@
 #include "Record.h"
 #include "Function.h"
 
-struct select_file_struct {
-	DBFile *inFile;
-	Pipe *outPipe;
-	CNF *selOp;
-	Record *literal;
-};
 
 class RelationalOp {
 	public:
@@ -27,11 +21,17 @@ class SelectFile : public RelationalOp {
 
 	private:
 	pthread_t thread;
-	// Record *buffer;
-	static void *select_file_function (void *s);
+	Record *buffer;
+	DBFile *inFile;
+	Pipe *outPipe;
+	CNF *selOp;
+	Record *literal;
 
 	public:
 
+	static void *select_file_helper (void *arg);
+	void *select_file_function ();
+	
 	void Run (DBFile &inFile, Pipe &outPipe, CNF &selOp, Record &literal);
 	void WaitUntilDone ();
 	void Use_n_Pages (int n);
