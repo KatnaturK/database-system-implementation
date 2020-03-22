@@ -252,6 +252,14 @@ void* Sum::sum_helper (void* arg) {
     s->sum_function();
 }
 
+void Sum::add_result (Type rtype, int &isum, int ires, double &dsum, double dres) {
+    if (rtype == Int) {
+        isum += ires;
+    } else if (rtype == Double) {
+        dsum += dres;
+    }
+}
+
 void* Sum::sum_function () {
     cout << "starting sum\n";
     int intsum = 0, intres = 0;
@@ -262,12 +270,7 @@ void* Sum::sum_function () {
 
     while (inPipe->Remove(&rec)) {
         resultType = func->Apply(rec, intres, doubleres);
-        if (resultType == Int) {
-            intsum += intres;
-        }
-        else if (resultType == Double) {
-            doublesum += doubleres;
-        }
+        add_result(resultType, intsum, intres, doublesum, doubleres);
     }
 
     Attribute attr = {(char *)"sum", resultType};
@@ -286,6 +289,102 @@ void* Sum::sum_function () {
     resultRec.ComposeRecord(&res_schema, sum_string);
 
     outPipe->Insert(&resultRec);
+
+    outPipe->ShutDown();
+    pthread_exit(NULL);
+}
+
+// ***** GROUP BY ******* //
+
+void GroupBy::Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe) {
+    this->inPipe = &inPipe;
+    this->outPipe = &outPipe;
+    this->groupAtts = &groupAtts;
+    this->func = &computeMe;
+    pthread_create(&thread, NULL, groupby_helper, (void*)this);
+}
+
+void GroupBy::WaitUntilDone () {
+    pthread_join (thread, NULL);
+}
+
+void GroupBy::Use_n_Pages (int runlen) {
+    this->runlen = runlen;
+    return;
+}
+
+void* GroupBy::groupby_helper (void* arg) {
+    GroupBy *s = (GroupBy *)arg;
+    s->groupby_function();
+}
+
+void GroupBy::add_result (Type rtype, int &isum, int ires, double &dsum, double dres) {
+    if (rtype == Int) {
+        isum += ires;
+    } else if (rtype == Double) {
+        dsum += dres;
+    }
+}
+
+void GroupBy::create_sum_record (Record &gAttsRec, Record &resRec, Type rtype, int isum, double dsum) {
+    Attribute attr = {(char *)"sum", rtype};
+    Schema res_schema((char *)"sum_result_schema", 1, &attr);
+    char sum_string[20];
+
+    if (rtype == Int) {
+        sprintf(sum_string, "%d|", isum);
+        cout << "after sum value : " << isum << "\n";
+    }
+    else if (rtype == Double) {
+        sprintf(sum_string, "%f|", dsum);
+        cout << "after sum value : " << dsum << "\n";
+    }
+
+    Record sumRec;
+    sumRec.ComposeRecord(&res_schema, sum_string);
+
+    int numAtts = groupAtts->numAtts + 1;
+    int sumAtts[numAtts];
+    sumAtts[0] = 0;
+    for (int i = 1 ; i < numAtts ; i++) {
+        sumAtts[i] = groupAtts->whichAtts[i-1];
+    }
+
+    resRec.MergeRecords(&sumRec, &gAttsRec, 1, numAtts-1, sumAtts, numAtts, 1);
+}
+
+void* GroupBy::groupby_function () {
+    cout << "starting group by\n";
+
+    Pipe *sortedOutPipe = new Pipe(100);
+    BigQ sortQ(*inPipe, *sortedOutPipe, *groupAtts, runlen);
+
+    int intsum = 0, intres = 0;
+    double doublesum = 0, doubleres = 0;
+    Type resultType;
+
+    bool groupChanged = false;
+
+    Record prev, curr;
+    ComparisonEngine ce;
+
+    sortedOutPipe->Remove(&prev);
+    resultType = func->Apply(prev, intres, doubleres);
+    add_result(resultType, intsum, intres, doublesum, doubleres);
+
+    Record resultRec;
+
+    while (inPipe->Remove(&curr)) {
+        if (ce.Compare(&prev, &curr, groupAtts)) {
+            groupChanged = true;
+            create_sum_record(prev, resultRec, resultType, intsum, doublesum);
+            outPipe->Insert(&resultRec);
+        } 
+        else {
+            func->Apply(prev, intres, doubleres);
+            add_result(resultType, intsum, intres, doublesum, doubleres);
+        }
+    }
 
     outPipe->ShutDown();
     pthread_exit(NULL);
