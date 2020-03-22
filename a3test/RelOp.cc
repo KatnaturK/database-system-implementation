@@ -229,3 +229,64 @@ void* DuplicateRemoval::duplicate_function () {
     outPipe->ShutDown();
     pthread_exit(NULL);
 }
+
+// ***** SUM ******* //
+
+void Sum::Run (Pipe &inPipe, Pipe &outPipe, Function &computeMe) {
+    this->inPipe = &inPipe;
+    this->outPipe = &outPipe;
+    this->func = &computeMe;
+    pthread_create(&thread, NULL, sum_helper, (void*)this);
+}
+
+void Sum::WaitUntilDone () {
+    pthread_join (thread, NULL);
+}
+
+void Sum::Use_n_Pages (int runlen) {
+    return;
+}
+
+void* Sum::sum_helper (void* arg) {
+    Sum *s = (Sum *)arg;
+    s->sum_function();
+}
+
+void* Sum::sum_function () {
+    cout << "starting sum\n";
+    int intsum = 0, intres = 0;
+    double doublesum = 0, doubleres = 0;
+    Type resultType;
+
+    Record rec, resultRec;
+
+    while (inPipe->Remove(&rec)) {
+        resultType = func->Apply(rec, intres, doubleres);
+        if (resultType == Int) {
+            intsum += intres;
+        }
+        else if (resultType == Double) {
+            doublesum += doubleres;
+        }
+    }
+
+    Attribute attr = {(char *)"sum", resultType};
+    Schema res_schema((char *)"sum_result_schema", 1, &attr);
+    char sum_string[20];
+
+    if (resultType == Int) {
+        sprintf(sum_string, "%d|", intsum);
+        cout << "after sum value : " << intsum << "\n";
+    }
+    else if (resultType == Double) {
+        sprintf(sum_string, "%f|", doublesum);
+        cout << "after sum value : " << doublesum << "\n";
+    }
+
+    resultRec.ComposeRecord(&res_schema, sum_string);
+
+    outPipe->Insert(&resultRec);
+
+    outPipe->ShutDown();
+    pthread_exit(NULL);
+}

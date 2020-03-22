@@ -17,9 +17,9 @@ int main () {
 
     setup ();
 
-    relation *rel_ptr[] = {n, r, c, p, ps, o, li};
+    relation *rel_ptr[] = {s, n, r, c, p, ps, o, li};
 
-    for (int i = 0 ; i < 7 ; i++) {
+    for (int i = 0 ; i < 8 ; i++) {
         initializeDBFiles(rel_ptr[i]);
     }
 

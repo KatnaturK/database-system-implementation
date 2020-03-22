@@ -57,6 +57,7 @@ int HeapFile::Open (char *filePath) {
 
   readPage = true;
   pageCount = runFile.GetLength ();
+  cout << "PAGE COUNT " << pageCount << "\n";
   MoveFirst ();
   return 1;
 }
@@ -64,7 +65,7 @@ int HeapFile::Open (char *filePath) {
 void HeapFile::MoveFirst () {
 
   if (runFile.GetLength () == 0) 
-   cerr << "DB-000: Invalid Operation ! Empty File !! " ;
+   cerr << "DB-000: Invalid Operation ! Empty File !!\n" ;
   else {   
     if (writePage) {
       runFile.AddPage (&p,pageNumber);

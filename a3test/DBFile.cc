@@ -24,6 +24,9 @@ int DBFile::Open (char *filePath) {
 
   fileTypeEnum fileType;
   fileType = run.filetype;
+  fileType = heap;
+
+  cout << "FILE TYPE " << fileType << endl;
 
   if (fileType == heap) {
     // cout << "Trying to open Heap DBFIle";
