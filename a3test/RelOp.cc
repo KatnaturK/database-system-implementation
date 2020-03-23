@@ -290,3 +290,211 @@ void* Sum::sum_function () {
     outPipe->ShutDown();
     pthread_exit(NULL);
 }
+
+
+// ***** JOIN ******* //
+
+void Join::Run (Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal) {
+    this->inPipeL = &inPipeL;
+    this->inPipeR = &inPipeR;
+    this->outPipe = &outPipe;
+    this->selOp = &selOp;
+    this->literal = &literal;
+    pthread_create(&thread, NULL, joinRoutine, (void*) this);
+}
+
+void Join::WaitUntilDone () {
+	pthread_join (thread, NULL);
+}
+
+void Join::Use_n_Pages (int n) {
+	this->ruLength = n;
+}
+
+void* Join::joinRoutine(void* routine) {
+    ((Join *) routine)->PerformJoin ();
+}
+
+void* Join::PerformJoin () {
+    OrderMaker orderL, orderR;
+	this->selOp->GetSortOrders (orderL, orderR);
+
+    if (orderL.numAtts && orderR.numAtts && orderL.numAtts == orderR.numAtts) {
+
+        Pipe pipeL(100), pipeR(100);
+		BigQ *bigQL = new BigQ (*(this->inPipeL), pipeL, orderL, this->ruLength);
+		BigQ *bigQR = new BigQ (*(this->inPipeR), pipeR, orderR, this->ruLength);
+
+        vector<Record *> vectorL, vectorR;
+		Record *rcdL = new Record (), *rcdR = new Record ();
+		ComparisonEngine cmp;
+
+        if (pipeL.Remove (rcdL) && pipeR.Remove (rcdR)) {
+
+            int leftAttr = ((int *) rcdL->bits)[1] / sizeof(int) -1;
+			int rightAttr = ((int *) rcdR->bits)[1] / sizeof(int) -1;
+			int totalAttr = leftAttr + rightAttr;
+			int attrToKeep[totalAttr];
+			for (int i = 0; i < leftAttr; i++) attrToKeep[i] = i;
+			for (int i = 0; i < rightAttr; i++) attrToKeep[i + leftAttr] = i;
+			
+            int joinNum, num = 0;
+			bool leftOK = true, rightOK = true;
+
+            while (leftOK && rightOK) {
+				
+                leftOK = false;
+                rightOK = false;
+				int cmpRst = cmp.Compare (rcdL, &orderL, rcdR, &orderR);
+
+                switch (cmpRst) {
+                    case 0: {
+                        Record *rcd1 = new Record (), *rcd2 = new Record (); 
+                        rcd1->Consume(rcdL);
+                        rcd2->Consume(rcdR);
+                        vectorL.push_back (rcd1);
+                        vectorR.push_back (rcd2);
+
+                        while (pipeL.Remove (rcdL)) {
+                            if (0 == cmp.Compare (rcdL, rcd1, &orderL)) {
+                                Record *cLMe = new Record ();
+                                cLMe->Consume (rcdL);
+                                vectorL.push_back (cLMe);
+                            } else {
+                                leftOK = true;
+                                break;
+                            }
+                        }
+
+                        while (pipeR.Remove (rcdR)) {
+                            if (0 == cmp.Compare (rcdR, rcd2, &orderR)) {
+                                Record *cRMe = new Record ();
+                                cRMe->Consume (rcdR);
+                                vectorR.push_back (cRMe);
+                            } else {
+                                rightOK = true;
+                                break;
+                            }
+                        }
+
+                        Record *lr = new Record, *rr = new Record, *jr = new Record;
+
+                        for (vector<Record *>::iterator itL = vectorL.begin (); itL != vectorL.end (); itL++) {
+                            lr->Consume (*itL);
+                            for (vector<Record *>::iterator itR = vectorR.begin (); itR != vectorR.end (); itR++) {
+                                if (1 == cmp.Compare (lr, *itR, this->literal, this->selOp)) {
+                                    joinNum++;
+                                    rr->Copy (*itR);
+                                    jr->MergeRecords (lr, rr, leftAttr, rightAttr, attrToKeep, leftAttr+rightAttr, leftAttr);
+                                    this->outPipe->Insert (jr);
+                                }
+                            }
+                        }
+
+                        for (vector<Record *>::iterator it = vectorL.begin (); it != vectorL.end( ); it++) 
+		                    if (!*it) delete *it;
+                        for (vector<Record *>::iterator it = vectorR.begin (); it != vectorR.end( ); it++)
+		                    if (!*it) delete *it;
+		                vectorL.clear();
+		                vectorR.clear();
+                        break;
+                    }
+                    case 1:
+                        leftOK = true;
+					    if (pipeR.Remove (rcdR)) rightOK = true;
+					    break;
+
+                    case -1:
+                        rightOK = true;
+					    if (pipeL.Remove (rcdL)) leftOK = true;
+					    break;
+
+                }
+            }
+        }
+    } else {
+
+        int n_pages = 10;
+        Record *rcdL = new Record, *rcdR = new Record;
+        Page pageR;
+        
+        DBFile dbFileL;
+        fileTypeEnum fileType = heap;
+        dbFileL.Create((char*)"tmpL", fileType, NULL);
+        dbFileL.MoveFirst();
+
+        int leftAttr, rightAttr, totalAttr, *attrToKeep;
+
+        if (this->inPipeL->Remove (rcdL) && this->inPipeR->Remove (rcdR)) {
+
+            leftAttr = ((int *) rcdL->bits)[1] / sizeof (int) -1;
+			rightAttr = ((int *) rcdR->bits)[1] / sizeof (int) -1;
+			totalAttr = leftAttr + rightAttr;
+			attrToKeep = new int[totalAttr];
+			for (int i = 0; i< leftAttr; i++) attrToKeep[i] = i;
+            for (int i = 0; i< rightAttr; i++) attrToKeep[i + leftAttr] = i;
+
+            do {
+                dbFileL.Add (*rcdL);
+            }while (this->inPipeL->Remove (rcdL));
+
+            vector<Record *> vectorR;
+            ComparisonEngine cmp;
+			bool rMore = true;
+			int joinNum = 0;
+
+            while (rMore) {
+
+                Record *first = new Record ();
+                first->Copy (rcdR);
+                pageR.Append (rcdR);
+                vectorR.push_back (first);
+
+                int rPages = 0;
+                rMore = false;
+
+                while (this->inPipeR->Remove (rcdR)) {
+
+                    Record *copyMe = new Record ();
+					copyMe->Copy (rcdR);
+
+                    if (!pageR.Append (rcdR)) {
+                        rPages += 1;
+                        if (rPages >= n_pages -1) {
+                            rMore = true;
+                            break;
+                        } else {
+                            pageR.EmptyItOut ();
+                            pageR.Append (rcdR);
+                            vectorR.push_back (copyMe);
+                        }
+                    } else {
+                        vectorR.push_back(copyMe);
+                    }
+                }
+
+                dbFileL.MoveFirst ();
+				int fileRN = 0;
+
+                while (dbFileL.GetNext (*rcdL)) {
+                    for (vector<Record *>::iterator it = vectorR.begin (); it!=vectorR.end (); it++) {
+                        if (1 == cmp.Compare (rcdL, *it, this->literal, this->selOp)) {
+                            joinNum++;
+							Record *jr = new Record (), *rr = new Record ();
+							rr->Copy (*it);
+							jr->MergeRecords (rcdL, rr, leftAttr, rightAttr, attrToKeep, leftAttr+rightAttr, leftAttr);
+							this->outPipe->Insert (jr);
+                        }
+                    }
+                }
+
+                for (vector<Record *>::iterator it = vectorR.begin (); it != vectorR.end( ); it++)
+                    if (!*it) delete *it;
+                vectorR.clear();
+            }
+
+            dbFileL.Close();
+        }
+    }
+    this->outPipe->ShutDown ();
+}

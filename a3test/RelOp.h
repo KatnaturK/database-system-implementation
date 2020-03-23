@@ -82,10 +82,20 @@ class Project : public RelationalOp {
 
 
 class Join : public RelationalOp { 
+	private:
+		pthread_t thread;
+        Pipe *inPipeL, *inPipeR, *outPipe;
+        CNF *selOp;
+        Record *literal;
+        int ruLength;
+        
 	public:
-	void Run (Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal) { }
-	void WaitUntilDone () { }
-	void Use_n_Pages (int n) { }
+		static void* joinRoutine(void* routine);
+
+		void* PerformJoin ();
+		void Run (Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal);
+		void WaitUntilDone ();
+		void Use_n_Pages (int n);
 };
 
 
