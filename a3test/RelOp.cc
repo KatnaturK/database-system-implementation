@@ -597,5 +597,4 @@ void* GroupBy::groupby_function () {
 
     outPipe->ShutDown();
     pthread_exit(NULL);
->>>>>>> 8dade4dbd8cca6fb2721981bded3d809e6c1b383
 }
