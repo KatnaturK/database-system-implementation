@@ -126,6 +126,7 @@ class Sum : public RelationalOp {
 
 	static void *sum_helper (void *arg);
 	void *sum_function ();
+	void add_result (Type rtype, int &isum, int ires, double &dsum, double dres);
 
 	public:
 	void Run (Pipe &inPipe, Pipe &outPipe, Function &computeMe);
@@ -134,10 +135,23 @@ class Sum : public RelationalOp {
 };
 
 class GroupBy : public RelationalOp {
+	private:
+	pthread_t thread;
+	int runlen;
+	Pipe *inPipe;
+	Pipe *outPipe;
+	OrderMaker *groupAtts;
+	Function *func;
+
+	static void *groupby_helper (void *arg);
+	void *groupby_function ();
+	void add_result (Type rtype, int &isum, int ires, double &dsum, double dres);
+	void create_sum_record (Record &gAttsRec, Record &resRec, Type rtype, int isum, double dsum);
+
 	public:
-	void Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe) { }
-	void WaitUntilDone () { }
-	void Use_n_Pages (int n) { }
+	void Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe);
+	void WaitUntilDone ();
+	void Use_n_Pages (int n);
 };
 
 
