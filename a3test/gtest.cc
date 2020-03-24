@@ -1,6 +1,62 @@
 #include "gtest/gtest.h"
 #include "test.h"
 
+TEST (RELATIONAL_OPERATION, SELECT_GROUP_BY) {
+	setup ();
+
+	char *pred_s = "(s_suppkey = s_suppkey)";
+	init_SF_s (pred_s, 100);
+	char *pred_ps = "(ps_suppkey = ps_suppkey)";
+	init_SF_ps (pred_ps, 100);
+
+	Join J;
+	Pipe _s_ps (pipesz);
+	CNF cnf_p_ps;
+	Record lit_p_ps;
+	get_cnf ("(s_suppkey = ps_suppkey)", s->schema(), ps->schema(), cnf_p_ps, lit_p_ps);
+
+	int outAtts = sAtts + psAtts;
+	Attribute s_nationkey = {"s_nationkey", Int};
+	Attribute ps_supplycost = {"ps_supplycost", Double};
+	Attribute joinatt[] = {IA,SA,SA,s_nationkey,SA,DA,SA,IA,IA,IA,ps_supplycost,SA};
+	Schema join_sch ("join_sch", outAtts, joinatt);
+
+	GroupBy G;
+	Pipe _out (pipesz);
+	Function func;
+	char *str_sum = "(ps_supplycost)";
+	get_cnf (str_sum, &join_sch, func);
+	func.Print ();
+	OrderMaker grp_order;
+	grp_order.numAtts=1;
+	int n = join_sch.GetNumAtts();
+	Attribute *myAtts=join_sch.GetAtts();
+	for(int i=0;i<n;i++) {
+		if(i==3) {
+			grp_order.whichAtts[0]=i;
+			grp_order.whichTypes[0]=Int;
+		}
+	}	
+
+	G.Use_n_Pages (1);
+	SF_s.Run (dbf_s, _s, cnf_s, lit_s); 
+	SF_ps.Run (dbf_ps, _ps, cnf_ps, lit_ps);
+	J.Run (_s, _ps, _s_ps, cnf_p_ps, lit_p_ps);
+	G.Run (_s_ps, _out, grp_order, func);
+	SF_s.WaitUntilDone();
+	SF_ps.WaitUntilDone ();
+	J.WaitUntilDone ();
+	G.WaitUntilDone ();
+
+	Schema sum_sch ("sum_sch", 1, &DA);
+	int result = clear_pipe (_out, &sum_sch, true);
+
+	dbf_s.Close ();
+	dbf_ps.Close ();
+
+	ASSERT_EQ (result, 25);
+}
+
 TEST (RELATIONAL_OPERATION, SELECT_PIPE_1) {
 	setup ();
 
@@ -50,30 +106,34 @@ TEST (RELATIONAL_OPERATION, PROJECT) {
 	ASSERT_EQ (result, 22);
 }
 
-
+/*
 TEST (RELATIONAL_OPERATION, SUM_TEST) {
 	setup ();
 	
 	char *pred_s = "(s_suppkey = s_suppkey)";
 	init_SF_s (pred_s, 100);
 	Sum T;
-	Pipe outPipe (1);
+	Pipe _out (1);
 	Function func;
 	char *str_sum = "(s_acctbal + (s_acctbal * 1.05))";
 	get_cnf (str_sum, s->schema (), func);
 	func.Print ();
 	T.Use_n_Pages (1);
 	SF_s.Run (dbf_s, _s, cnf_s, lit_s);
-	T.Run (_s, outPipe, func);
+	T.Run (_s, _out, func);
 	SF_s.WaitUntilDone ();
 	T.WaitUntilDone ();
+
 	Schema out_sch ("out_sch", 1, &DA);
-	int result = clear_pipe (outPipe, &out_sch, true);
+	int result = clear_pipe (_out, &out_sch, true);
+
+	cout << "\n\n query3 returned " << result << " records \n";
+
 	dbf_s.Close ();
 	
 	ASSERT_EQ (result, 1);
 }
-
+*/
 
 int main (int argc, char *argv[]) {
 	testing::InitGoogleTest(&argc, argv);
