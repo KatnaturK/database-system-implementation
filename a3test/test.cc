@@ -183,6 +183,7 @@ void q4 () {
 		CNF cnf_p_ps;
 		Record lit_p_ps;
 		get_cnf ("(s_suppkey = ps_suppkey)", s->schema(), ps->schema(), cnf_p_ps, lit_p_ps);
+	J.Use_n_Pages(100);
 
 	int outAtts = sAtts + psAtts;
 	Attribute ps_supplycost = {"ps_supplycost", Double};
@@ -256,7 +257,6 @@ void q6 () {
 	cout << " query6 \n";
 	char *pred_s = "(s_suppkey = s_suppkey)";
 	init_SF_s (pred_s, 100);
-	SF_s.Run (dbf_s, _s, cnf_s, lit_s); // 10k recs qualified
 
 	char *pred_ps = "(ps_suppkey = ps_suppkey)";
 	init_SF_ps (pred_ps, 100);
@@ -277,18 +277,31 @@ void q6 () {
 
 	GroupBy G;
 		// _s (input pipe)
-		Pipe _out (1);
+		Pipe _out (pipesz);
 		Function func;
-			char *str_sum = "(ps_supplycost)";
-			get_cnf (str_sum, &join_sch, func);
-			func.Print ();
-			OrderMaker grp_order (&join_sch);
+		char *str_sum = "(ps_supplycost)";
+		get_cnf (str_sum, &join_sch, func);
+		func.Print ();
+		// OrderMaker grp_order (&join_sch);
+		OrderMaker grp_order;
+		grp_order.numAtts=1;
+		int n = join_sch.GetNumAtts();
+		Attribute *myAtts=join_sch.GetAtts();
+		for(int i=0;i<n;i++) {
+			if(i==3) {
+				grp_order.whichAtts[0]=i;
+				grp_order.whichTypes[0]=Int;
+			}
+		}	
+
 	G.Use_n_Pages (1);
 
+	SF_s.Run (dbf_s, _s, cnf_s, lit_s); // 10k recs qualified
 	SF_ps.Run (dbf_ps, _ps, cnf_ps, lit_ps); // 161 recs qualified
 	J.Run (_s, _ps, _s_ps, cnf_p_ps, lit_p_ps);
 	G.Run (_s_ps, _out, grp_order, func);
 
+	SF_s.WaitUntilDone();
 	SF_ps.WaitUntilDone ();
 	J.WaitUntilDone ();
 	G.WaitUntilDone ();

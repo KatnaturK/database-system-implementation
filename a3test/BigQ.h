@@ -1,71 +1,51 @@
 #ifndef BIGQ_H
 #define BIGQ_H
+#pragma once
+
 
 #include <algorithm>
 #include <iostream>
 #include <pthread.h>
-#include<set>
+#include <stdio.h>
 #include <string>
+#include <queue>
 #include <vector>
 
+#include "ComparisonEngine.h"
+#include "DBFile.h"
 #include "File.h"
 #include "Pipe.h"
 #include "Record.h"
 
+class DBFile; 
+
 using namespace std;
 
-class RecordOperator {
-
-public:
-        static int compareRecords (const void *rc1, const void *rc2);
-        Record tmpRecord;
-        OrderMaker *sortedOrder;
-};
-
-class CustomRecord {
-
-public:
-        Record newRecord;
-        int runPosition;
-        OrderMaker *sortedOrder;
-};
-
-class CustomPage {
-
-public:
-        Page page; 
-        int currentPageNum; 
-};
-
-class RunPage {
-
-public:
-        int startPageNum;
-        int endPageNum;
-};
-
 class BigQ {
-
-        Pipe *in, *out;
-        OrderMaker *sortOrder;
-        int runLength;
-
 public:
-        BigQ (Pipe &in, Pipe &out, OrderMaker &sortOrder, int runlen);
+	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);
 	~BigQ ();
 
-        char *tmpRunFile;
-        File runFile;
-        int currentPageNum;
-        int runCount;
-        vector<pair<int,int> > pages;
-        vector<RunPage*> runPages;
+	static void * bigQRoutine(void *bigQ);
 
-        static void* worker (void* worker);
-        
-        void tmpmmsPhase1 ();
-        void tmpmmsPhase2 ();
-        void generateRuns (vector<RecordOperator*> records);
-	
+private:
+	DBFile * dbFile;
+	File runFile;
+	int runLength;
+	OrderMaker &orderMarker;
+	Pipe &inPipe, &outPipe;
+	pthread_t bigQthread;
+	string tmpFile;
+	std::string rndStr (size_t length) {
+		auto rndChar = [] () -> char {
+			const char chrArr[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+			const size_t index = (sizeof(chrArr) - 1);
+			return chrArr[ rand() % index ];
+		};
+		std::string str (length, 0);
+		std::generate_n (str.begin(), length, rndChar);
+		return str;
+	}
 };
+
 #endif

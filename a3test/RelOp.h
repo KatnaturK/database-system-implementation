@@ -7,7 +7,6 @@
 #include "BigQ.h"
 #include "Function.h"
 
-
 class RelationalOp {
 	public:
 	// blocks the caller until the particular relational operator 
@@ -80,24 +79,23 @@ class Project : public RelationalOp {
 	void Use_n_Pages (int n);
 };
 
-
 class Join : public RelationalOp { 
+	
 	private:
-		pthread_t thread;
-        Pipe *inPipeL, *inPipeR, *outPipe;
-        CNF *selOp;
-        Record *literal;
-        int ruLength;
-        
+		CNF *selOp;
+		int runLength;
+		Pipe *leftInPipe, *rightInPipe, *outPipe;
+	 	pthread_t joinThread;
+		Record *literal;
+
 	public:
 		static void* joinRoutine(void* routine);
-
+		
 		void* PerformJoin ();
 		void Run (Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal);
 		void WaitUntilDone ();
 		void Use_n_Pages (int n);
 };
-
 
 class DuplicateRemoval : public RelationalOp {
 	private:
@@ -136,22 +134,21 @@ class Sum : public RelationalOp {
 
 class GroupBy : public RelationalOp {
 	private:
-	pthread_t thread;
-	int runlen;
-	Pipe *inPipe;
-	Pipe *outPipe;
-	OrderMaker *groupAtts;
-	Function *func;
+		pthread_t thread;
+		int runlen;
+		Pipe *inPipe;
+		Pipe *outPipe;
+		OrderMaker *groupAtts;
+		Function *func;
 
-	static void *groupby_helper (void *arg);
-	void *groupby_function ();
-	void add_result (Type rtype, int &isum, int ires, double &dsum, double dres);
-	void create_sum_record (Record &gAttsRec, Record &resRec, Type rtype, int isum, double dsum);
-
+	
 	public:
-	void Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe);
-	void WaitUntilDone ();
-	void Use_n_Pages (int n);
+		static void* groupByRoutine(void* arg);
+
+		void* PerformGroupBy ();
+		void Run (Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe);
+		void WaitUntilDone ();
+		void Use_n_Pages (int n);
 };
 
 
