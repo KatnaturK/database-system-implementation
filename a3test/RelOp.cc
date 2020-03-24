@@ -225,7 +225,7 @@ void* DuplicateRemoval::duplicate_function () {
     outPipe->Insert(&prev);
     count++;
 
-    // cout << "after duplicate removal count : " << count << "\n";
+    cout << "after duplicate removal count : " << count << "\n";
     outPipe->ShutDown();
     pthread_exit(NULL);
 }

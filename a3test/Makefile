@@ -9,7 +9,10 @@ endif
 
 test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o test.o
 	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o GenericDBFile.o File.o DBFile.o HeapFile.o SortedFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o test.o -lfl -lpthread
-	
+
+gtest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o BigQ.o Function.o RelOp.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o gtest.o
+	$(CC) -o gtest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o BigQ.o Function.o RelOp.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o gtest.o -lfl -lgtest -lpthread
+
 a2-2test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o a2-2test.o
 	$(CC) -o a2-2test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o Pipe.o y.tab.o lex.yy.o a2-2test.o -lfl -lpthread
 	
@@ -21,6 +24,9 @@ a1test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pi
 	
 test.o: test.cc
 	$(CC) -g -c test.cc
+
+gtest.o: gtest.cc
+	$(CC) -g -c gtest.cc
 	
 a2-2test.o: a2-2test.cc
 	$(CC) -g -c a2-2test.cc
