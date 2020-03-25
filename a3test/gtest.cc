@@ -106,22 +106,21 @@ TEST (RELATIONAL_OPERATION, PROJECT) {
 	ASSERT_EQ (result, 22);
 }
 
-/*
 TEST (RELATIONAL_OPERATION, SUM_TEST) {
 	setup ();
-	
-	char *pred_s = "(s_suppkey = s_suppkey)";
-	init_SF_s (pred_s, 100);
+
+	char *pred_n = "(n_regionkey > 3)";
+	init_SF_n (pred_n, 100);
 	Sum T;
 	Pipe _out (1);
 	Function func;
-	char *str_sum = "(s_acctbal + (s_acctbal * 1.05))";
-	get_cnf (str_sum, s->schema (), func);
+	char *str_sum = "(n_regionkey)";
+	get_cnf (str_sum, n->schema (), func);
 	func.Print ();
 	T.Use_n_Pages (1);
-	SF_s.Run (dbf_s, _s, cnf_s, lit_s);
-	T.Run (_s, _out, func);
-	SF_s.WaitUntilDone ();
+	SF_n.Run (dbf_n, _n, cnf_n, lit_n);
+	T.Run (_n, _out, func);
+	SF_n.WaitUntilDone ();
 	T.WaitUntilDone ();
 
 	Schema out_sch ("out_sch", 1, &DA);
@@ -129,11 +128,10 @@ TEST (RELATIONAL_OPERATION, SUM_TEST) {
 
 	cout << "\n\n query3 returned " << result << " records \n";
 
-	dbf_s.Close ();
+	dbf_n.Close ();
 	
 	ASSERT_EQ (result, 1);
 }
-*/
 
 int main (int argc, char *argv[]) {
 	testing::InitGoogleTest(&argc, argv);

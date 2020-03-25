@@ -55,12 +55,12 @@ void init_SF_c(char *pred_str, int numpgs);
 int pipesz = 100; // buffer sz allowed for each pipe
 int buffsz = 100; // pages of memory allowed for operations
 
-SelectFile SF_ps, SF_p, SF_s, SF_o, SF_li, SF_c;
-DBFile dbf_ps, dbf_p, dbf_s, dbf_o, dbf_li, dbf_c;
-Pipe _ps (pipesz), _p (pipesz), _s (pipesz), _o (pipesz), _li (pipesz), _c (pipesz);
-CNF cnf_ps, cnf_p, cnf_s, cnf_o, cnf_li, cnf_c;
-Record lit_ps, lit_p, lit_s, lit_o, lit_li, lit_c;
-Function func_ps, func_p, func_s, func_o, func_li, func_c;
+SelectFile SF_ps, SF_p, SF_s, SF_o, SF_li, SF_c, SF_n;
+DBFile dbf_ps, dbf_p, dbf_s, dbf_o, dbf_li, dbf_c, dbf_n;
+Pipe _ps (pipesz), _p (pipesz), _s (pipesz), _o (pipesz), _li (pipesz), _c (pipesz), _n (pipesz);
+CNF cnf_ps, cnf_p, cnf_s, cnf_o, cnf_li, cnf_c, cnf_n;
+Record lit_ps, lit_p, lit_s, lit_o, lit_li, lit_c, lit_n;
+Function func_ps, func_p, func_s, func_o, func_li, func_c, func_n;
 
 int pAtts = 9;
 int psAtts = 5;
@@ -261,6 +261,12 @@ void init_SF_c (char *pred_str, int numpgs) {
 	dbf_c.Open (c->path());
 	get_cnf (pred_str, c->schema (), cnf_c, lit_c);
 	SF_c.Use_n_Pages (numpgs);
+}
+
+void init_SF_n (char *pred_str, int numpgs) {
+	dbf_n.Open (n->path());
+	get_cnf (pred_str, n->schema (), cnf_n, lit_n);
+	SF_n.Use_n_Pages (numpgs);
 }
 
 void setup () {
