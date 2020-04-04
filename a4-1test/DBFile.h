@@ -1,32 +1,46 @@
 #ifndef DBFILE_H
 #define DBFILE_H
 
-#include "TwoWayList.h"
-#include "Record.h"
-#include "Schema.h"
-#include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
+#include "Defs.h"
+#include "File.h"
+#include "GenericDBFile.h"
+#include "Pipe.h"
+#include "Record.h"
+#include "Schema.h"
+#include "TwoWayList.h"
 
-typedef enum {heap, sorted, tree} fType;
+struct runStruct {
+        int runlength;
+        fileTypeEnum filetype;
+        OrderMaker sortOrder;
+};
 
-// stub DBFile header..replace it with your own DBFile.h 
+struct sortStruct {
+        OrderMaker *sortOrder;
+        int length;
+};
 
 class DBFile {
 
 public:
-	DBFile (); 
+        
+        GenericDBFile* genericDBFile;
+        
+        DBFile ();
+        ~DBFile();
+        
+        sortStruct *sort;
 
-	int Create (char *fpath, fType file_type, void *startup);
-	int Open (char *fpath);
-	int Close ();
-
-	void Load (Schema &myschema, char *loadpath);
-
-	void MoveFirst ();
-	void Add (Record &addme);
-	int GetNext (Record &fetchme);
-	int GetNext (Record &fetchme, CNF &cnf, Record &literal);
-
+        void Add (Record &addme);
+        int Close ();
+        int Create (char *filePath, fileTypeEnum fileType, void *startup);
+        int GetNext (Record &fetchme);
+        int GetNext (Record &fetchme, CNF &cnf, Record &literal);
+        void Load (Schema &myschema, char *loadpath);
+        void MoveFirst ();
+        int Open (char *filePath);
 };
 #endif
+

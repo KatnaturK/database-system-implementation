@@ -7,6 +7,7 @@
 #include <string.h>
 #include <iostream>
 #include <stdlib.h>
+#include <unistd.h>
 
 
 
@@ -154,6 +155,10 @@ void Page :: FromBinary (char *bits) {
 	}
 
 	delete temp;
+}
+
+bool Page::empty(){
+	return numRecs==0;
 }
 
 File :: File () {
