@@ -5,6 +5,12 @@ a*/*.out
 dbfiles/
 tpch-dbgen/
 
+*.bin
+*.bin.meta
+*.tbl
+*.tmp
+
+
 # Valgrind files #
 *vgcore*
 
