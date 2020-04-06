@@ -1,4 +1,4 @@
-#include "test.h"
+#include "a2test.h"
 
 void initializeDBFiles(relation *rel) {
     DBFile dbfile;
