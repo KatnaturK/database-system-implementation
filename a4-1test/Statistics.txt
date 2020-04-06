@@ -1,50 +1,11 @@
 
-Atrribute: n | Tuple Count: 25 | Groups: n | Group Size: 1
-Attribute: n.n_nationkey | Count: 25
-Attribute: n.n_regionkey | Count: 5
+Atrribute: lineitem | Tuple Count: 21433 | Groups: ,part,lineitem | Group Size: 2
+Attribute: l_partkey | Count: 200000
+Attribute: l_shipinstruct | Count: 4
+Attribute: l_shipmode | Count: 7
 
 
-Atrribute: nation | Tuple Count: -1 | Groups: ,part,partsupp,supplier,nation,region | Group Size: 5
-Attribute: n_nationkey | Count: 25
-Attribute: n_regionkey | Count: 5
-
-
-Atrribute: p | Tuple Count: 200000 | Groups: p | Group Size: 1
-Attribute: p.p_partkey | Count: 200000
-Attribute: p.p_size | Count: 50
-
-
-Atrribute: part | Tuple Count: -1 | Groups: ,part,partsupp,supplier,nation,region | Group Size: 5
+Atrribute: part | Tuple Count: 21433 | Groups: ,part,lineitem | Group Size: 2
+Attribute: p_container | Count: 40
 Attribute: p_partkey | Count: 200000
-Attribute: p_size | Count: 50
-
-
-Atrribute: partsupp | Tuple Count: -1 | Groups: ,part,partsupp,supplier,nation,region | Group Size: 5
-Attribute: ps_partkey | Count: 200000
-Attribute: ps_suppkey | Count: 10000
-
-
-Atrribute: ps | Tuple Count: 800000 | Groups: ps | Group Size: 1
-Attribute: ps.ps_partkey | Count: 200000
-Attribute: ps.ps_suppkey | Count: 10000
-
-
-Atrribute: r | Tuple Count: 5 | Groups: r | Group Size: 1
-Attribute: r.r_name | Count: 5
-Attribute: r.r_regionkey | Count: 5
-
-
-Atrribute: region | Tuple Count: -1 | Groups: ,part,partsupp,supplier,nation,region | Group Size: 5
-Attribute: r_name | Count: 5
-Attribute: r_regionkey | Count: 5
-
-
-Atrribute: s | Tuple Count: 10000 | Groups: s | Group Size: 1
-Attribute: s.s_nationkey | Count: 25
-Attribute: s.s_suppkey | Count: 10000
-
-
-Atrribute: supplier | Tuple Count: -1 | Groups: ,part,partsupp,supplier,nation,region | Group Size: 5
-Attribute: s_nationkey | Count: 25
-Attribute: s_suppkey | Count: 10000
 

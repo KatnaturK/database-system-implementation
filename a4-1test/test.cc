@@ -198,7 +198,7 @@ void q3 (){
 	// s.Read(fileName);
 	
 	s.AddRel(relName[0],10000);
-	s.AddAtt(relName[0], "s_nationey",25);
+	s.AddAtt(relName[0], "s_nationkey",25);
 
 	s.AddRel(relName[1],150000);
 	s.AddAtt(relName[1], "c_custkey",150000);
@@ -271,31 +271,32 @@ void q4 (){
 	s.CopyRel("nation","n");
 	s.CopyRel("region","r");
 
+	char *newRelName[] = {"p", "ps", "s", "n", "r"};
+
 	char *cnf = "(p.p_partkey=ps.ps_partkey) AND (p.p_size = 2)";
 	yy_scan_string(cnf);
 	yyparse();
-	s.Apply(final, relName, 2);
+	s.Apply(final, newRelName, 2);
 
 	cnf ="(s.s_suppkey = ps.ps_suppkey)";
 	yy_scan_string(cnf);
 	yyparse();
-	s.Apply(final, relName, 3);
+	s.Apply(final, newRelName, 3);
 
 	cnf =" (s.s_nationkey = n.n_nationkey)";
 	yy_scan_string(cnf);
 	yyparse();
-	s.Apply(final, relName, 4);
+	s.Apply(final, newRelName, 4);
 
 	cnf ="(n.n_regionkey = r.r_regionkey) AND (r.r_name = 'AMERICA') ";
 	yy_scan_string(cnf);
 	yyparse();
 
-	double result = s.Estimate(final, relName, 5);
+	double result = s.Estimate(final, newRelName, 5);
 	if(fabs(result-3200)>0.1)
 		cout<<"error in estimating Q4\n";
 
-	s.Apply(final, relName, 5);	
-	
+	s.Apply(final, newRelName, 5);	
 	s.Write(fileName);
 	
 
@@ -315,6 +316,7 @@ void q5 (){
 	s.AddRel(relName[1],1500000);
 	s.AddAtt(relName[1], "o_orderkey",1500000);
 	s.AddAtt(relName[1], "o_custkey",150000);
+	s.AddAtt(relName[1], "o_orderdate",99996);
 	
 	s.AddRel(relName[2],6001215);
 	s.AddAtt(relName[2], "l_orderkey",1500000);
@@ -397,8 +399,8 @@ void q7(){
 	
 	s.AddRel(relName[1],6001215);
 	s.AddAtt(relName[1], "l_orderkey",1500000);
+	s.AddAtt(relName[1],"l_receiptdate",198455);
 	
-
 	char *cnf = "(l_receiptdate >'1995-02-01' ) AND (l_orderkey = o_orderkey)";
 
 	yy_scan_string(cnf);
@@ -489,8 +491,6 @@ void q10 (){
 	Statistics s;
         char *relName[] = { "customer", "orders", "lineitem","nation"};
 
-	// s.Read(fileName);
-	
 	s.AddRel(relName[0],150000);
 	s.AddAtt(relName[0], "c_custkey",150000);
 	s.AddAtt(relName[0], "c_nationkey",25);
@@ -498,8 +498,8 @@ void q10 (){
 	s.AddRel(relName[1],1500000);
 	s.AddAtt(relName[1], "o_orderkey",1500000);
 	s.AddAtt(relName[1], "o_custkey",150000);
-	s.AddAtt(relName[1], "o_orderdate",150000);
-
+	s.AddAtt(relName[1], "o_orderdate",99996);
+	
 	s.AddRel(relName[2],6001215);
 	s.AddAtt(relName[2], "l_orderkey",1500000);
 	
@@ -512,12 +512,14 @@ void q10 (){
 	s.Apply(final, relName, 2);
 
 	cnf = " (l_orderkey = o_orderkey) ";
-	yy_scan_string(cnf);                                                                               	yyparse();
+	yy_scan_string(cnf);
+	yyparse();
 
 	s.Apply(final, relName, 3);  
 	
 	cnf = "(c_nationkey = n_nationkey) ";
-	yy_scan_string(cnf);                                                                               	yyparse();	
+	yy_scan_string(cnf);
+	yyparse();	
 	
 	double result = s.Estimate(final, relName, 4);
 	if(fabs(result-2000405)>0.1)
