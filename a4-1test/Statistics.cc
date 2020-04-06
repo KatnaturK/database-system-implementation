@@ -156,7 +156,7 @@ double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numT
     double tupleEstimation = 1;
     map<string,long> distinctValues;
 
-    if(!ErrorCheck(parseTree,relNames,numToJoin,distinctValues)) {
+    if(!GivesError(parseTree,relNames,numToJoin,distinctValues)) {
         cout<<"\nStatistics :: Estimate --> (Msg) Input Parameters invalid for Estimation";
         return -1.0;
 
@@ -229,7 +229,26 @@ double Statistics::Assess(struct OrList *orList, map<string,long> &distinctValue
     return (1.0-selectionEstimate);
 }
 
-bool Statistics::ErrorCheck(struct AndList *parseTree, char *relNames[], int numToJoin,map<string,long> &distinctValues) {
+bool Statistics::AtrrtibutePresent(char *value,char *relNames[], int numToJoin,map<string,long> &distinctValues) {
+    int currNum = 0;    
+    while(currNum < numToJoin) {
+        map<string,RelationStatistics*>::iterator relStatsItr = relStatsMap.find(relNames[currNum]);    
+
+        if(relStatsItr != relStatsMap.end()) {
+            
+            string key = string(value);
+            if(relStatsItr->second->GetRelationAttributes()->find(key) != relStatsItr->second->GetRelationAttributes()->end()) {
+                distinctValues[key] = relStatsItr->second->GetRelationAttributes()->find(key)->second;
+                return true;
+            }
+        } else
+            return false;
+        currNum++;
+    }
+    return false;
+}
+
+bool Statistics::GivesError(struct AndList *parseTree, char *relNames[], int numToJoin,map<string,long> &distinctValues) {
 
     bool noError = true;
     while(parseTree != NULL && noError) {
@@ -272,23 +291,4 @@ bool Statistics::ErrorCheck(struct AndList *parseTree, char *relNames[], int num
         }
     }
     return noError;
-}
-
-bool Statistics::AtrrtibutePresent(char *value,char *relNames[], int numToJoin,map<string,long> &distinctValues) {
-    int currNum = 0;    
-    while(currNum < numToJoin) {
-        map<string,RelationStatistics*>::iterator relStatsItr = relStatsMap.find(relNames[currNum]);    
-
-        if(relStatsItr != relStatsMap.end()) {
-            
-            string key = string(value);
-            if(relStatsItr->second->GetRelationAttributes()->find(key) != relStatsItr->second->GetRelationAttributes()->end()) {
-                distinctValues[key] = relStatsItr->second->GetRelationAttributes()->find(key)->second;
-                return true;
-            }
-        } else
-            return false;
-        currNum++;
-    }
-    return false;
 }

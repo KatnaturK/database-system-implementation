@@ -86,7 +86,7 @@ public:
 
 	double Assess(struct OrList *orList, map<string,long> &distinctValues);
 	bool AtrrtibutePresent(char *attributeValue, char *relNames[], int numToJoin, map<string,long> &distinctValues);
-	bool ErrorCheck(struct AndList *parseTree, char *relNames[], int numToJoin, map<string,long> &distinctValues);
+	bool GivesError(struct AndList *parseTree, char *relNames[], int numToJoin, map<string,long> &distinctValues);
 
 	map<string,RelationStatistics*>* getRelStatsMap() {
 		return &relStatsMap;
