@@ -1,0 +1,11 @@
+
+Atrribute: lineitem | Tuple Count: 21433 | Groups: ,part,lineitem | Group Size: 2
+Attribute: l_partkey | Count: 200000
+Attribute: l_shipinstruct | Count: 4
+Attribute: l_shipmode | Count: 7
+
+
+Atrribute: part | Tuple Count: 21433 | Groups: ,part,lineitem | Group Size: 2
+Attribute: p_container | Count: 40
+Attribute: p_partkey | Count: 200000
+
