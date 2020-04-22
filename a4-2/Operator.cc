@@ -42,7 +42,7 @@ SelectFileOperator::SelectFileOperator(AndList *selectList, Schema *schema, stri
 }
 
 void SelectFileOperator::print() {
-    cout << endl << "Operation: Select File" << endl;
+    cout << endl << "SELECT FILE operation" << endl;
     cout << "Output pipe: " << this->getPipeID() << endl;
     cout << endl << "Output Schema:" << endl;
     this->outputSchema->Print();
@@ -59,7 +59,7 @@ SelectPipeOperator::SelectPipeOperator(Operator *child, AndList *selectList) {
 
 
 void SelectPipeOperator::print() {
-    cout << endl << "Operation: Select Pipe" << endl;
+    cout << endl << "SELECT PIPE operation" << endl;
     cout << "Input Pipe " << this->left->getPipeID() << endl;
     cout << "Output Pipe " << this->getPipeID() << endl;
     cout << endl << "Output Schema:" << endl;

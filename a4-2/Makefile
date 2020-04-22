@@ -7,9 +7,9 @@ ifdef linux
 tag = -n
 endif
 
-a4-2.out: Comparison.o ComparisonEngine.o Schema.o Record.o File.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o BigQ.o RelOp.o Function.o Statistics.o y.tab.o lex.yy.o
-	$(CC) -o a4-2.out Comparison.o ComparisonEngine.o Schema.o Record.o File.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o BigQ.o RelOp.o Function.o Statistics.o y.tab.o lex.yy.o -lfl -lpthread
-	
+a42.out: Comparison.o ComparisonEngine.o Schema.o Record.o File.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o BigQ.o Operator.o RelOp.o Function.o Statistics.o y.tab.o lex.yy.o a42.o
+	$(CC) -o a42.out Comparison.o ComparisonEngine.o Schema.o Record.o File.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o BigQ.o Operator.o RelOp.o Function.o Statistics.o y.tab.o lex.yy.o a42.o -lfl -lpthread
+
 a2test.out: Comparison.o ComparisonEngine.o Schema.o Record.o  File.o BigQ.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o RelOp.o Function.o Statistics.o y.tab.o lex.yy.o a2test.o
 	$(CC) -o a2test.out Comparison.o ComparisonEngine.o Schema.o Record.o File.o BigQ.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o Pipe.o RelOp.o Function.o Statistics.o y.tab.o lex.yy.o a2test.o -lfl -lpthread
 
@@ -19,8 +19,8 @@ gtest.out: Comparison.o ComparisonEngine.o Schema.o Record.o File.o GenericDBFil
 main:   y.tab.o lex.yy.o main.o
 	$(CC) -o main y.tab.o lex.yy.o main.o -lfl
 
-# test.o: test.cc
-# 	$(CC) -g -c test.cc
+a42.o: a42.cc
+	$(CC) -g -c a42.cc
 
 a2test.o: a2test.cc
 	$(CC) -g -c a2test.cc

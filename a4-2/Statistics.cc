@@ -1,294 +1,331 @@
 #include "Statistics.h"
+#include <iostream>
+#include <map>
+#include <set>
+#include <stdlib.h>
+#include <fstream>
+#include <math.h>
+#include <string.h>
 
-Statistics::Statistics() {}
 
-Statistics::Statistics(Statistics &copyMe) {
-
-    map<string,RelationStatistics*> *relStatsPtr = copyMe.getRelStatsMap();
-    map<string,RelationStatistics*>::iterator relStatsItr;
-    RelationStatistics *relStats;
-
-    for( relStatsItr=relStatsPtr->begin(); relStatsItr!=relStatsPtr->end(); relStatsItr++) {        
-        relStats = new RelationStatistics(*relStatsItr->second);
-        relStatsMap[relStatsItr->first] = relStats;
-    }
+Statistics::Statistics() {
+    relationMap = new map<string, int>();
+    attrMap = new map<string, map<string, int> >();
 }
 
-Statistics::~Statistics() {
-    map<string,RelationStatistics*>::iterator relStatsItr;
-    RelationStatistics *relStats = NULL;
 
-    for(relStatsItr = relStatsMap.begin(); relStatsItr != relStatsMap.end(); relStatsItr++) {
-        relStats = relStatsItr->second;
-        delete relStats;
-        relStats = NULL;
-    }
-    relStatsMap.clear();
+Statistics::Statistics(Statistics &copyMe) {
+    relationMap = new map<string, int>(*(copyMe.relationMap));
+    attrMap = new map<string, map<string, int> >(*(copyMe.attrMap));
+}
+
+
+Statistics::~Statistics() {
+    delete relationMap;
+    delete attrMap;
 }
 
 void Statistics::AddRel(char *relName, int numTuples) {
-    map<string,RelationStatistics*>::iterator relStatsItr;
-    RelationStatistics *relStats;
-    relStatsItr = relStatsMap.find(string(relName));
-    
-    if(relStatsItr!=relStatsMap.end()) {
-        
-        relStatsMap[string(relName)]->UpdateCount(numTuples);
-        relStatsMap[string(relName)]->SetGroupDetails(relName,1);
-    
-    } else {
-        relStats= new RelationStatistics(numTuples,string(relName));
-        relStatsMap[string(relName)]=relStats;
+    string relation(relName);
+
+    auto result = relationMap->insert(pair<string, int>(relation, numTuples));
+
+    //replace existing
+    if (!result.second) {
+        relationMap->erase(result.first);
+        relationMap->insert(pair<string, int>(relation, numTuples));
     }
 }
 
 void Statistics::AddAtt(char *relName, char *attName, int numDistincts) {
-    map<string,RelationStatistics*>::iterator relStatsItr;
-    relStatsItr = relStatsMap.find(string(relName));
-    
-    if(relStatsItr!=relStatsMap.end()) {
-        relStatsMap[string(relName)]->UpdateData(string(attName),numDistincts);
-    }  
+    string relation(relName);
+    string attr(attName);
+
+    if (numDistincts == -1) {
+        int numTuples = relationMap->at(relation);
+        (*attrMap)[relation][attr] = numTuples;
+    } else {
+        (*attrMap)[relation][attr] = numDistincts;
+    }
 }
 
-void Statistics::CopyRel(char *oldName, char *newName) {
-    string oldRelation = string(oldName);
-    string newRelation = string(newName);
-    if( strcmp(oldName,newName) == 0)  
-        return;
+void Statistics::CopyRel(char *oldName1, char *newName1) {
+    string oldName(oldName1);
+    string newName(newName1);
 
-    map<string,RelationStatistics*>::iterator relStatsItr1;
-    map<string,RelationStatistics*>::iterator relStatsItr2;
-    relStatsItr2 = relStatsMap.find(newRelation);
-    
-    if(relStatsItr2 != relStatsMap.end()) {
-        
-        delete relStatsItr2->second;
-        string temp=relStatsItr2->first;
-        relStatsItr2++;
-        relStatsMap.erase(temp);
-    }
 
-    relStatsItr1 = relStatsMap.find(oldRelation);
-    RelationStatistics *relStats;
-    
-    if(relStatsItr1 != relStatsMap.end()) {
-        RelationStatistics* tmpRelation = new RelationStatistics( relStatsMap[string(oldName)]->GetTupleCount(), newRelation);
-        relStats = relStatsMap[oldRelation];
-        map<string,int>::iterator tableiter = relStats->GetRelationAttributes()->begin();
-        for(;tableiter != relStats->GetRelationAttributes()->end(); tableiter++) {
-            string temp = newRelation + "." + tableiter->first;
-            tmpRelation->UpdateData(temp, tableiter->second);
-        }
-        relStatsMap[string(newName)] = tmpRelation;
-    
-    } else {
-        cout << "\nStatistics :: CopyRel --> (Msg) Invalid relation name: "<< oldName <<endl;
-        exit(1);
+    int oldNumTuples = (*relationMap)[oldName];
+    (*relationMap)[newName] = oldNumTuples;
+
+    map<string, int> &oldAttrMap = (*attrMap)[oldName];
+
+    for (auto oldAttrInfo = oldAttrMap.begin();
+         oldAttrInfo != oldAttrMap.end(); ++oldAttrInfo) {
+        string newAtt = newName;
+        newAtt += "." + oldAttrInfo->first;
+        (*attrMap)[newName][newAtt] = oldAttrInfo->second;
     }
 }
 
 void Statistics::Read(char *fromWhere) {
-    
-    FILE *file = NULL;
-    file = fopen(fromWhere, "r");
-    char readCharArr[200];    
-    while(file != NULL && fscanf(file, "%s", readCharArr) != EOF) {
-        if(strcmp(readCharArr, "BEGIN") == 0) {
-            int rowCount = 0, groupNo = 0, distinctCount = 0;
-            char relationNameArr[200], groupNameArr[200], attributeNameArr[200];;
-            fscanf(file, "%s %ld %s %d", relationNameArr, &rowCount, groupNameArr, &groupNo);                   
-            AddRel(relationNameArr, rowCount);
-            relStatsMap[string(relationNameArr)]->SetGroupDetails(groupNameArr,groupNo);
-            fscanf(file, "%s", attributeNameArr);      
+    relationMap->clear();
+    attrMap->clear();
 
-            while(strcmp(attributeNameArr,"END") != 0) {
-                fscanf(file, "%d", &distinctCount);
-                AddAtt(relationNameArr, attributeNameArr, distinctCount);                
-                fscanf(file, "%s", attributeNameArr);                                                                
-            }                                                
-        }                
+    ifstream file_exists(fromWhere);
+    if (!file_exists) {
+        cerr << "The give file_path '" << fromWhere << "' doest not exist";
+        return;
     }
+
+    string fileName(fromWhere);
+    ifstream statFile;
+    statFile.open(fileName.c_str(), ios::in);
+
+    string str;
+    statFile >> str;
+    int relationCount = atoi(str.c_str());
+
+
+    for (int i = 0; i < relationCount; i++) {
+        statFile >> str;
+
+        size_t index = str.find_first_of(':');
+        string relationName = str.substr(0, index);
+        string numOfTupleStr = str.substr(index + 1);
+
+        (*relationMap)[relationName] = atoi(numOfTupleStr.c_str());
+    }
+
+    statFile >> str;
+    string relName, attrName, distinctCount;
+    statFile >> relName >> attrName >> distinctCount;
+
+    while (!statFile.eof()) {
+        int distinctCountInt = atoi(distinctCount.c_str());
+        (*attrMap)[relName][attrName] = distinctCountInt;
+        statFile >> relName >> attrName >> distinctCount;
+    }
+    statFile.close();
 }
 
 void Statistics::Write(char *fromWhere) {
+    string fileName(fromWhere);
+    //delete existing file
+    remove(fromWhere);
 
-     map<string,RelationStatistics*>::iterator relStatsItr; 
-     map<string,int>::iterator mapItr;
-     map<string,int> *map;
+    ofstream statFile;
+    statFile.open(fileName.c_str(), ios::out);
 
-     FILE *file;
-     file = fopen(fromWhere, "w");
-     relStatsItr = relStatsMap.begin();
-     
-     for( ; relStatsItr != relStatsMap.end(); relStatsItr++) {
-         fprintf(file,"\n");
-         fprintf(file, "Atrribute: %s | Tuple Count: %ld | Groups: %s | Group Size: %d\n", relStatsItr->first.c_str(), relStatsItr->second->GetTupleCount(), relStatsItr->second->GetGroupName().c_str(), relStatsItr->second->GetGroupLength());
-         map = relStatsItr->second->GetRelationAttributes();
-         mapItr = map->begin();
-         
-         for( ; mapItr != map->end(); mapItr++)
-            fprintf(file,"Attribute: %s | Count: %d\n", mapItr->first.c_str(), mapItr->second);
-         fprintf(file,"\n");      
-     }
-     fclose(file);     
+    statFile << relationMap->size() << "\n";
+
+    for (auto entry = relationMap->begin(); entry != relationMap->end(); entry++)
+        statFile << entry->first.c_str() << ":" << entry->second << "\n";
+
+    statFile << attrMap->size() << "\n";
+
+    for (auto relItr = attrMap->begin(); relItr != attrMap->end(); ++relItr)
+        for (auto attrItr = relItr->second.begin(); attrItr != relItr->second.end(); ++attrItr)
+            statFile << (*relItr).first.c_str() << " " << (*attrItr).first.c_str() << " " << (*attrItr).second << "\n";
+
+    statFile.close();
 }
 
-void  Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJoin) {
-  
-    double estimation = Estimate(parseTree,relNames,numToJoin);
-    long result =(long)((estimation-floor(estimation)) >= 0.5 ? ceil(estimation) : floor(estimation));
-    string groupNm = "" ;
-    int groupCnt = numToJoin;
+void Statistics::Apply(struct AndList *parseTree, char *relNames[], int numToJoin) {
+    struct AndList *curAnd;
+    struct OrList *curOr;
 
-    for(int i=0;i<groupCnt;i++)
-        groupNm = groupNm + "," + relNames[i];
+    map<string, int> opratorMap;
+    curAnd = parseTree;
+    while (curAnd != NULL) {
+        curOr = curAnd->left;
+        while (curOr != NULL) {
+            opratorMap[curOr->left->left->value] = curOr->left->code;
+            curOr = curOr->rightOr;
+        }
+        curAnd = curAnd->rightAnd;
+    }
 
-    map<string,RelationStatistics*>::iterator relStatsItr = relStatsMap.begin();
-    for(int i = 0; i < numToJoin; i++) {
-        relStatsMap[relNames[i]]->SetGroupDetails(groupNm, groupCnt);
-        relStatsMap[relNames[i]]->UpdateCount(result);
+    double result = Estimate(parseTree, relNames, numToJoin);
+
+    map<string, int>::iterator opMapItr, countMapItr;
+    set<string> joinAttrSet;
+    if (joinFlag2) {
+        for (opMapItr = opratorMap.begin(); opMapItr != opratorMap.end(); opMapItr++) {
+            for (int i = 0; (i < relationMap->size()) && (i < numToJoin); i++) {
+                if (relNames[i] == NULL)
+                    continue;
+                int count = ((*attrMap)[relNames[i]]).count(opMapItr->first);
+                if (count == 0)
+                    continue;
+                else if (count == 1) {
+                    for (countMapItr = (*attrMap)[relNames[i]].begin();
+                         countMapItr != (*attrMap)[relNames[i]].end(); countMapItr++) {
+                        if ((opMapItr->second == LESS_THAN) || (opMapItr->second == GREATER_THAN)) {
+                            (*attrMap)[joinLeftRel + "_" +
+                                       joinRightRel][countMapItr->first] = (int) round(
+                                    (double) (countMapItr->second) / 3.0);
+                        } else if (opMapItr->second == EQUALS) {
+                            if (opMapItr->first == countMapItr->first)
+                                (*attrMap)[joinLeftRel + "_" + joinRightRel][countMapItr->first] = 1;
+                            else
+                                (*attrMap)[joinLeftRel + "_" + joinRightRel][countMapItr->first] = min(
+                                        (int) round(result), countMapItr->second);
+                        }
+                    }
+                    break;
+                } else if (count > 1) {
+                    for (countMapItr = (*attrMap)[relNames[i]].begin();
+                         countMapItr != (*attrMap)[relNames[i]].end(); countMapItr++) {
+                        if (opMapItr->second == EQUALS) {
+                            if (opMapItr->first == countMapItr->first) {
+                                (*attrMap)[joinLeftRel + "_" +
+                                           joinRightRel][countMapItr->first] = count;
+                            } else
+                                (*attrMap)[joinLeftRel + "_" +
+                                           joinRightRel][countMapItr->first] = min(
+                                        (int) round(result), countMapItr->second);
+                        }
+                    }
+                    break;
+                }
+                joinAttrSet.insert(relNames[i]);
+            }
+        }
+
+        if (joinAttrSet.count(joinLeftRel) == 0) {
+            for (auto entry = (*attrMap)[joinLeftRel].begin();
+                 entry != (*attrMap)[joinLeftRel].end(); entry++) {
+                (*attrMap)[joinLeftRel + "_" + joinRightRel][entry->first] = entry->second;
+
+            }
+        }
+        if (joinAttrSet.count(joinRightRel) == 0) {
+            for (auto entry = (*attrMap)[joinRightRel].begin();
+                 entry != (*attrMap)[joinRightRel].end(); entry++) {
+                (*attrMap)[joinLeftRel + "_" + joinRightRel][entry->first] = entry->second;
+
+            }
+        }
+        (*relationMap)[joinLeftRel + "_" + joinRightRel] = round(result);
+
+        relationMap->erase(joinLeftRel);
+        relationMap->erase(joinRightRel);
+        attrMap->erase(joinLeftRel);
+        attrMap->erase(joinRightRel);
+
+    } else {
+        // find the rel for which the attr belongs to
+        string relName;
+        for (auto entry = opratorMap.begin(); entry != opratorMap.end(); entry++) {
+            for (auto mapEntry = attrMap->begin(); mapEntry != attrMap->end(); ++mapEntry)
+                if ((*attrMap)[mapEntry->first].count(entry->first) > 0) {
+                    relName = mapEntry->first;
+                    break;
+                }
+        }
+        (*relationMap)[relName] = round(result);
     }
 }
 
 double Statistics::Estimate(struct AndList *parseTree, char **relNames, int numToJoin) {
-    
-    double tupleEstimation = 1;
-    map<string,long> distinctValues;
 
-    if(!GivesError(parseTree,relNames,numToJoin,distinctValues)) {
-        cout<<"\nStatistics :: Estimate --> (Msg) Input Parameters invalid for Estimation";
-        return -1.0;
+    struct AndList *curAnd;
+    struct OrList *curOr;
+    string leftRel, rightRel, leftAttr, rightAttr, prevAttr;
+    bool isPrevious = false;
+    bool isAnotherPrevious = false;
+    double result = 0.0;
+    double andResult = 1.0;
+    double orResult = 1.0;
 
-    } else {
+    curAnd = parseTree;
 
-        string groupNm = "";
-        map<string,long>::iterator tupleItr;
-        map<string,long> values;
-        int groupCnt = numToJoin;
+    while (curAnd != NULL) {
+        curOr = curAnd->left;
+        orResult = 1.0;
 
-        for(int i=0;i<groupCnt;i++)
-            groupNm = groupNm + "," + relNames[i];
+        while (curOr != NULL) {
+            ComparisonOp *compOp = curOr->left;
+            joinFlag1 = false;
+            leftAttr = compOp->left->value;
 
-        for(int i=0;i<numToJoin;i++)
-            values[relStatsMap[relNames[i]]->GetGroupName()] = relStatsMap[relNames[i]]->GetTupleCount();
-        
-        tupleEstimation = 1000.0;
+            if (leftAttr == prevAttr)
+                isPrevious = true;
+            prevAttr = leftAttr;
 
-        while(parseTree != NULL) {
-            tupleEstimation*=Assess(parseTree->left,distinctValues);
-            parseTree=parseTree->rightAnd;
-        }
-
-        tupleItr=values.begin();
-        for(;tupleItr!=values.end();tupleItr++)
-            tupleEstimation*=tupleItr->second;
-    }
-
-    tupleEstimation = tupleEstimation / 1000.0;
-    return tupleEstimation;
-}
-
-double Statistics::Assess(struct OrList *orList, map<string,long> &distinctValues) {
-    
-    struct ComparisonOp *comparisionOp;
-    map<string,double> atrributeMap;
-
-    while(orList != NULL) {
-        
-        comparisionOp = orList->left;
-        string key = string(comparisionOp->left->value);
-
-        if(atrributeMap.find(key) == atrributeMap.end())
-            atrributeMap[key] = 0.0;
-        
-        if(comparisionOp->code == 1 || comparisionOp->code == 2)
-            atrributeMap[key] = atrributeMap[key] + 1.0 / 3;
-        else {
-            string joinKey = string(comparisionOp->left->value);            
-            long maxDistinctValue = distinctValues[joinKey];
-            
-            if(comparisionOp->right->code == 4) {
-               
-               string urkey = string(comparisionOp->right->value);
-               if(maxDistinctValue<distinctValues[urkey])
-                   maxDistinctValue = distinctValues[urkey];
+            for (auto iterator = attrMap->begin();
+                 iterator != attrMap->end(); iterator++) {
+                if ((*attrMap)[iterator->first].count(leftAttr) > 0) {
+                    leftRel = iterator->first;
+                    break;
+                }
             }
 
-            atrributeMap[key] = atrributeMap[key] + 1.0 / maxDistinctValue;
-        }
-        orList = orList->rightOr;
-    }
 
-    double selectionEstimate = 1.0;
-    map<string,double>::iterator attributeItr = atrributeMap.begin();
+            if (compOp->right->code == NAME) {
+                joinFlag1 = true;
+                joinFlag2 = true;
+                rightAttr = compOp->right->value;
 
-    for(;attributeItr!=atrributeMap.end();attributeItr++)
-        selectionEstimate*=(1.0-attributeItr->second);
-    
-    return (1.0-selectionEstimate);
-}
-
-bool Statistics::AtrrtibutePresent(char *value,char *relNames[], int numToJoin,map<string,long> &distinctValues) {
-    int currNum = 0;    
-    while(currNum < numToJoin) {
-        map<string,RelationStatistics*>::iterator relStatsItr = relStatsMap.find(relNames[currNum]);    
-
-        if(relStatsItr != relStatsMap.end()) {
-            
-            string key = string(value);
-            if(relStatsItr->second->GetRelationAttributes()->find(key) != relStatsItr->second->GetRelationAttributes()->end()) {
-                distinctValues[key] = relStatsItr->second->GetRelationAttributes()->find(key)->second;
-                return true;
+                for (auto iterator = attrMap->begin();
+                     iterator != attrMap->end(); ++iterator) {
+                    if ((*attrMap)[iterator->first].count(rightAttr) > 0) {
+                        rightRel = iterator->first;
+                        break;
+                    }
+                }
             }
-        } else
-            return false;
-        currNum++;
-    }
-    return false;
-}
 
-bool Statistics::GivesError(struct AndList *parseTree, char *relNames[], int numToJoin,map<string,long> &distinctValues) {
+            if (joinFlag1) {
+                if (compOp->code == EQUALS)
+                    orResult *= (1.0 - (1.0 / max((*attrMap)[leftRel][compOp->left->value],
+                                                  (*attrMap)[rightRel][compOp->right->value])));
+                joinLeftRel = leftRel;
+                joinRightRel = rightRel;
+            } else {
+                if (isPrevious) {
+                    if (!isAnotherPrevious) {
+                        orResult = 1.0 - orResult;
+                        isAnotherPrevious = true;
+                    }
+                    if (compOp->code == GREATER_THAN || compOp->code == LESS_THAN)
+                        orResult += (1.0 / 3.0);
 
-    bool noError = true;
-    while(parseTree != NULL && noError) {
+                    if (compOp->code == EQUALS)
+                        orResult += (1.0 / ((*attrMap)[leftRel][compOp->left->value]));
 
-        struct OrList *head=parseTree->left;
-        while(head!=NULL && noError) {
-            
-            struct ComparisonOp *comparisionOp = head->left;
-            if(comparisionOp->left->code == 4 && comparisionOp->code == 3 && !AtrrtibutePresent(comparisionOp->left->value, relNames, numToJoin, distinctValues)) {
-                cout<<"\n"<< comparisionOp->left->value <<" Does Not Exist";
-                noError = false;
-            }          
-            
-            if(comparisionOp->right->code == 4 && comparisionOp->code == 3 && !AtrrtibutePresent(comparisionOp->right->value, relNames, numToJoin, distinctValues))
-                noError = false;
-            
-            head = head->rightOr;
+                } else {
+                    if (compOp->code == GREATER_THAN || compOp->code == LESS_THAN)
+                        orResult *= (2.0 / 3.0);
+
+                    if (compOp->code == EQUALS)
+                        orResult *= (1.0 - (1.0 / (*attrMap)[leftRel][compOp->left->value]));
+                }
+            }
+            curOr = curOr->rightOr;
         }
-        parseTree = parseTree->rightAnd;
+
+        if (!isPrevious)
+            orResult = 1.0 - orResult;
+
+        isPrevious = false;
+        isAnotherPrevious = false;
+
+        andResult *= orResult;
+        curAnd = curAnd->rightAnd;
     }
 
-    if(!noError)
-        return noError;
+    double rightCount;
+    if (rightRel.empty())
+        rightCount = 0;
+    else
+        rightCount = (*relationMap)[rightRel];
 
-    map<string,int> tmpRelation;
-    for(int i = 0; i < numToJoin; i++) {
-        string groupNm = relStatsMap[string(relNames[i])]->GetGroupName();
-        
-        if(tmpRelation.find(groupNm) != tmpRelation.end())
-            tmpRelation[groupNm]--;
-        else
-            tmpRelation[groupNm] = relStatsMap[string(relNames[i])]->GetGroupLength()-1;
-    }
 
-    map<string,int>::iterator tmpRelationItr = tmpRelation.begin();
-    for( ; tmpRelationItr != tmpRelation.end(); tmpRelationItr++) {
-        if(tmpRelationItr->second != 0) {
-            noError = false;
-            break;
-        }
-    }
-    return noError;
+    if (joinFlag2)
+        result = (*relationMap)[joinLeftRel] * rightCount * andResult;
+    else
+        result = (*relationMap)[leftRel] * andResult;
+
+    return result;
 }
