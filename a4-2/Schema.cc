@@ -155,6 +155,54 @@ Schema :: Schema (char *fName, char *relName) {
 	fclose (foo);
 }
 
+void Schema :: Print () {
+    string typeName;
+    for (int i = 0; i < numAtts; i++) {
+        switch (myAtts[i].myType) {
+            case Int :
+                typeName = string ("Int");
+                break;
+
+            case Double :
+                typeName = string ("Double");
+                break;
+
+            case String :
+                typeName = string ("String");
+                break;
+
+            default :// should never come here!!!!!
+                cout << "Wrong Type! " << myAtts[i].myType << endl;
+        }
+        cout << myAtts[i].name << " : " <<  typeName << endl;
+    }
+}
+
+Schema* Schema :: Project (NameList* attsLeft, int* &keepMe) {
+    int numAttsOutput = 0;
+    NameList *cur = attsLeft;
+    while (cur) {
+        ++numAttsOutput;
+        cur = cur->next;
+    }
+    Attribute *resAtts = new Attribute[numAttsOutput];
+    keepMe = new int[numAttsOutput];
+
+    NameList* tmpList = attsLeft;
+
+    int i = 0;
+    while(tmpList)
+    {
+        resAtts[i].name = tmpList->name;
+        resAtts[i].myType = FindType(tmpList->name);
+        keepMe[i] = Find(tmpList->name);
+        tmpList = tmpList->next;
+        ++i;
+    }
+
+    return new Schema("projectedSchema", numAttsOutput, resAtts);
+}
+
 Schema :: ~Schema () {
 	delete [] myAtts;
 	myAtts = 0;

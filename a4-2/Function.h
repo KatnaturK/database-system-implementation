@@ -24,11 +24,11 @@ private:
 	Arithmatic *opList;
 	int numOps;
 
-	int returnsInt;
-
 public:
 
 	Function ();
+
+	int returnsInt;
 
 	// this grows the specified function from a parse tree and converts
 	// it into an accumulator-based computation over the attributes in

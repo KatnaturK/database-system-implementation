@@ -2,6 +2,7 @@
 #define NODE_H
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <stdio.h>
