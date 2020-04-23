@@ -1,12 +1,4 @@
-#include <algorithm>
-#include <climits>
-#include <cstring>
-#include <string>
-
-#include "Defs.h"
-#include "Errors.h"
 #include "Optimizer.h"
-#include "Stl.h"
 
 #define popVector(vel, el1, el2)                \
   OptimizerNode* el1 = vel.back();                  \
@@ -29,122 +21,115 @@
 #define indent(level) (string(3*(level), ' ') + "-> ")
 #define annot(level) (string(3*(level+1), ' ') + "* ")
 
-using std::endl;
-using std::string;
-
-extern char* catalog_path;
-extern char* dbfile_dir;
-extern char* tpch_dir;
-
-// // from parser
-// extern FuncOperator* finalFunction;
-// extern TableList* tables;
-// extern AndList* boolean;
-// extern NameList* groupingAtts;
-// extern NameList* attsToSelect;
-// extern int distinctAtts;
-// extern int distinctFunc;
-
-extern struct FuncOperator *finalFunction; // the aggregate function (NULL if no agg)
-extern struct TableList *tables; // the list of tables and aliases in the query
-extern struct AndList *boolean; // the predicate in the WHERE clause
-extern struct NameList *groupingAtts; // grouping atts (NULL if no grouping)
-extern struct NameList *attsToSelect; // the set of attributes in the SELECT (NULL if no such atts)
-extern int distinctAtts; // 1 if there is a DISTINCT in a non-aggregate query 
-extern int distinctFunc;  // 1 if there is a DISTINCT in an aggregate query
-
 
 Optimizer::Optimizer(Statistics* inStats): stats(inStats), isUsedPrev(NULL), selectQeryCount(0), joinQueryCount(0) {
   constructLeafNodes(); 
   processJoins();
   ProcessSums();
   processProjects();
-  makeDistinct();
-  makeWrite();
+  processDistinct();
+  processWrite();
   swap(boolean, isUsedPrev);
   FATALIF(isUsedPrev, "WHERE clause syntax error.");
   printNodes();
 }
 
 /**
- * 
+ * Optimizer Node constructor and functions.
 */
-void Optimizer::printNodes(ostream& os) {
-  os << "Number of selects: " << selectQeryCount << endl;
-  os << "Number of joins: " << joinQueryCount << endl;
-  if (groupingAtts) {
-    os << "GROUPING ON ";
-    for (NameList* att = groupingAtts; att; att = att->next)
-      os << att->name << " ";
-    os << endl;
-  }
-  os << "PRINTING TREE IN ORDER:\n\n";
-  OptimizerNode* opNode = opRootNode;
-  printNodesInOrder(opNode, os);
+int OptimizerNode::pipeId = 0;
+
+OptimizerNode::OptimizerNode(const string& inOperand, Schema* outSchema, Statistics* inStats):
+  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {}
+
+OptimizerNode::OptimizerNode(const string& inOperand, Schema* outSchema, char* inRelation, Statistics* inStats):
+  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {
+  if (inRelation) relations[relationCount++] = strdup(inRelation);
 }
 
-void Optimizer::printNodesInOrder(OptimizerNode* opNode, ostream& os) {
-  if (opNode) {
-    switch(opNode->childNodeCount) {
-      case 0:
-        opNode->print(os);
-        break;
-      
-      case 1: {
-        UnaryNode* temp = (UnaryNode*)opNode;
-        printNodesInOrder(temp->childOpNode, os);
-        opNode->print(os);
-        break;
-      }
-
-      case 2: {
-        BinaryNode* temp = (BinaryNode*)opNode;
-        printNodesInOrder(temp->leftOpNode, os);
-        printNodesInOrder(temp->rightOpNode, os);
-        opNode->print(os);
-        break;
-      }
-    }
-  }
+OptimizerNode::OptimizerNode(const string& inOperand, Schema* outSchema, char* inRelations[], size_t num, Statistics* inStats):
+  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {
+  for (; relationCount<num; ++relationCount)
+    relations[relationCount] = strdup(inRelations[relationCount]);
 }
 
-void OptimizerNode::print(ostream& os, size_t level) const {
-  os << "************" << endl;
-  printOperator(os, level);
-  printPipe(os, level);
-  printSchema(os, level);
-  printAnnot(os, level);
-  os << "\n";
+OptimizerNode::~OptimizerNode() {
+  delete outSchema;
+  for (size_t i=0; i<relationCount; ++i)
+    delete relations[i];
 }
 
-void OptimizerNode::printOperator(ostream& os, size_t level) const {
-  os << operand << " operation" << endl;
+AndList* OptimizerNode::pushSelection(AndList*& inAndList, Schema* inSchema) {
+  AndList andListHeader; 
+  AndList *cur = inAndList, *pre = &andListHeader, *result = NULL;
+  andListHeader.rightAnd = inAndList;  
+  for (; cur; cur = pre->rightAnd)
+    if (containedIn(cur->left, inSchema)) { 
+      pre->rightAnd = cur->rightAnd;
+      cur->rightAnd = result;
+      result = cur;
+    } else pre = cur;
+  inAndList = andListHeader.rightAnd; 
+  return result;
 }
 
-void OptimizerNode::printSchema(ostream& os, size_t level) const {
-  os << "Output schema:" << endl;
-  outSchema->print(os);
+bool OptimizerNode::containedIn(OrList* ors, Schema* target) {
+  for (; ors; ors=ors->rightOr)
+    if (!containedIn(ors->left, target)) return false;
+  return true;
 }
 
-void LeafNode::printPipe(ostream& os, size_t level) const {
-  os << "Output pipe: " << outPipeId << endl;
+bool OptimizerNode::containedIn(ComparisonOp* ce, Schema* schema) {
+  Operand *leftOperand = ce->left, *rightOperand = ce->right;
+  return (leftOperand->code!=NAME || schema->Find(leftOperand->value)!=-1) &&
+         (rightOperand->code!=NAME || schema->Find(rightOperand->value)!=-1);
+}
+/*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
+
+/**
+ * Unary and Binary Node constructors. 
+*/
+UnaryNode::UnaryNode(const string& inOperand, Schema* inOutSchema, OptimizerNode* inOpNode, Statistics* inStats):
+  OptimizerNode (inOperand, inOutSchema, inOpNode->relations, inOpNode->relationCount, inStats), childOpNode(inOpNode), inPipeId(inOpNode->outPipeId) {
+    childNodeCount = 1;
 }
 
-void UnaryNode::printPipe(ostream& os, size_t level) const {
+void UnaryNode::printPipe(ostream& os) const {
   os << "Input pipe: " << inPipeId << endl;
   os << "Output pipe: " << outPipeId << endl;
 }
 
-void BinaryNode::printPipe(ostream& os, size_t level) const {
+BinaryNode::BinaryNode(const string& inOperand, OptimizerNode* inLeftOpNode, OptimizerNode* inRightOpNode, Statistics* inStats):
+  OptimizerNode (inOperand, new Schema(*inLeftOpNode->outSchema, *inRightOpNode->outSchema), inStats),
+  leftOpNode(inLeftOpNode), rightOpNode(inRightOpNode) {
+  childNodeCount = 2;
+  inLeftPipeId = leftOpNode->outPipeId;
+  inRightPipeId = rightOpNode->outPipeId;
+  for (size_t i=0; i<inLeftOpNode->relationCount;)
+    relations[relationCount++] = strdup(inLeftOpNode->relations[i++]);
+  for (size_t j=0; j<inRightOpNode->relationCount;)
+    relations[relationCount++] = strdup(inRightOpNode->relations[j++]);
+}
+
+void BinaryNode::printPipe(ostream& os) const {
   os << "Left input pipe: " << inLeftPipeId << endl;
   os << "Right input pipe: " << inRightPipeId << endl;
   os << "Output pipe: " << outPipeId << endl;
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
+
 /**
- * 
+ * Leaf Node functions.
 */
+LeafNode::LeafNode(AndList*& currAndList, AndList*& pushedAndList, char* inRelation, char* inAlias, Statistics* inStats):
+  OptimizerNode("SELECT FILE", new Schema(catalog_path, inRelation, inAlias), inRelation, inStats) {
+  childNodeCount = 0;
+  pushedAndList = pushSelection(currAndList, outSchema);
+  processingEstimation = stat->Estimate(pushedAndList, relations, relationCount);
+  selfOperand.GrowFromParseTree(pushedAndList, outSchema, recordLiteral);
+}
+
 void Optimizer::constructLeafNodes() {
   for (TableList* table = tables; table; table = table->next) {
     stats->CopyRel(table->tableName, table->aliasAs);
@@ -159,12 +144,68 @@ void Optimizer::constructLeafNodes() {
   }
 }
 
-void LeafNode::printAnnot(ostream& os, size_t level) const {}
+void LeafNode::printPipe(ostream& os) const {
+  os << "Output pipe: " << outPipeId << endl;
+}
+
+void LeafNode::printAnnot(ostream& os) const {}
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
+
+
+/**
+ * Processing SELECT operations based upon the processing cost statistics. 
+*/
+SelectPipeNode::SelectPipeNode(CNF inSelfOperand, char* inRelation, char* inAlias, OptimizerNode* inOpNode):
+  UnaryNode("SELECT PIPE", new Schema(catalog_path, inRelation, inAlias), inOpNode, NULL), selfOperand(inSelfOperand) {}
+
+void SelectPipeNode::printAnnot(ostream& os) const {
+  os << "SELECTION CNF: " << endl;
+  selfOperand.Print(outSchema); 
+}
+/*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
+
+
+/**
+ * Processing PROJECT operations based upon the processing cost statistics. 
+*/
+ProjectNode::ProjectNode(NameList* inAtts, OptimizerNode* inOpNode):
+  UnaryNode("PROJECT", NULL, inOpNode, NULL), inputAttsCount(inOpNode->outSchema->GetNumAtts()), numAttsOut(0) {
+  Schema* schema = inOpNode->outSchema;
+  Attribute resultAtts[MAX_ATTRIBUTE_COUNT];
+  FATALIF (schema->GetNumAtts()>MAX_ATTRIBUTE_COUNT, "Too many attributes.");
+  for (; inAtts; inAtts=inAtts->next, numAttsOut++) {
+    FATALIF ((retainedAtts[numAttsOut]=schema->Find(inAtts->name))==-1,
+             "Projecting non-existing attribute.");
+    makeAttr(resultAtts[numAttsOut], inAtts->name, schema->FindType(inAtts->name));
+  }
+  outSchema = new Schema ("", numAttsOut, resultAtts);
+}
+
+void Optimizer::processProjects() {
+  if (attsToSelect && !finalFunction && !groupingAtts) 
+    opRootNode = new ProjectNode(attsToSelect, opRootNode);
+}
+
+void ProjectNode::printAnnot(ostream& os) const {
+  os << retainedAtts[0];
+  for (size_t i=1; i<numAttsOut; ++i) 
+    os << ',' << retainedAtts[i];
+  os << endl;
+}
+/*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
+
 
 /**
  * Sorting and processing JOIN operations based upon the processing cost statistics. 
 */
+JoinNode::JoinNode(AndList*& currAndList, AndList*& pushedAndList, OptimizerNode* inLeftOpNode, OptimizerNode* inRightOpNode, Statistics* inStats):
+  BinaryNode("JOIN", inLeftOpNode, inRightOpNode, inStats) {
+  pushedAndList = pushSelection(currAndList, outSchema);
+  processingEstimation = stat->Estimate(pushedAndList, relations, relationCount);
+  processingCost = inLeftOpNode->processingCost + processingEstimation + inRightOpNode->processingCost;
+  selOperand.GrowFromParseTree(pushedAndList, outSchema, recordLiteral);
+}
+
 void Optimizer::processJoins() {
   sortJoins();
   while (nodes.size()>1) {
@@ -216,19 +257,28 @@ void Optimizer::concatList(AndList*& left, AndList*& right) {
   right = NULL;
 }
 
-void JoinNode::printAnnot(ostream& os, size_t level) const {
+void JoinNode::printAnnot(ostream& os) const {
   os << "CNF: " << endl;
-  selOperand.Print();
-}
-
-void SumNode::printAnnot(ostream& os, size_t level) const {
-  os << "Function: "; (const_cast<Function*>(&function))->Print();
+  selOperand.Print(outSchema);
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
+
 
 /**
  * Processing SUM operations based upon the processing cost statistics. 
 */
+SumNode::SumNode(FuncOperator* inParseTree, OptimizerNode* inOpNode):
+  UnaryNode("SUM", resultSchema(inParseTree, inOpNode), inOpNode, NULL) {
+  function.GrowFromParseTree (inParseTree, *inOpNode->outSchema);
+}
+
+Schema* SumNode::resultSchema(FuncOperator* inParseTree, OptimizerNode* inOpNode) {
+  Function fun;
+  Attribute atts[2][1] = {{{"sum", Int}}, {{"sum", Double}}};
+  fun.GrowFromParseTree (inParseTree, *inOpNode->outSchema);
+  return new Schema ("", 1, atts[fun.resultType()]);
+}
+
 void Optimizer::ProcessSums() {
   if (groupingAtts) {
     FATALIF (!finalFunction, "Grouping without aggregation functions!");
@@ -240,179 +290,130 @@ void Optimizer::ProcessSums() {
   }
 }
 
-SumNode::SumNode(FuncOperator* parseTree, OptimizerNode* opNode):
-  UnaryNode("SUM", resultSchema(parseTree, opNode), opNode, NULL) {
-  function.GrowFromParseTree (parseTree, *opNode->outSchema);
-}
-
-Schema* SumNode::resultSchema(FuncOperator* parseTree, OptimizerNode* opNode) {
-  Function fun;
-  Attribute atts[2][1] = {{{"sum", Int}}, {{"sum", Double}}};
-  fun.GrowFromParseTree (parseTree, *opNode->outSchema);
-  return new Schema ("", 1, atts[fun.resultType()]);
+void SumNode::printAnnot(ostream& os) const {
+  os << "Function: "; (const_cast<Function*>(&function))->Print();
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
-void Optimizer::processProjects() {
-  if (attsToSelect && !finalFunction && !groupingAtts) opRootNode = new ProjectNode(attsToSelect, opRootNode);
+
+/**
+ * Processing PROJECT operations based upon the processing cost statistics. 
+*/
+GroupByNode::GroupByNode(NameList* inAtts, FuncOperator* inParseTree, OptimizerNode* inOpNode):
+  UnaryNode("GROUP BY", resultSchema(inAtts, inParseTree, inOpNode), inOpNode, NULL) {
+  orderMakerGrp.growFromParseTree(inAtts, inOpNode->outSchema);
+  function.GrowFromParseTree (inParseTree, *inOpNode->outSchema);
 }
 
-void Optimizer::makeDistinct() {
-  if (distinctAtts) opRootNode = new DedupNode(opRootNode);
-}
-
-void Optimizer::makeWrite() {
-  opRootNode = new WriteNode(stdout, opRootNode);
-}
-
-
-
-
-int OptimizerNode::pipeId = 0;
-
-OptimizerNode::OptimizerNode(const string& op, Schema* out, Statistics* inStats):
-  operand(op), outSchema(out), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {}
-
-OptimizerNode::OptimizerNode(const string& op, Schema* out, char* rName, Statistics* inStats):
-  operand(op), outSchema(out), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {
-  if (rName) relations[relationCount++] = strdup(rName);
-}
-
-OptimizerNode::OptimizerNode(const string& op, Schema* out, char* rNames[], size_t num, Statistics* inStats):
-  operand(op), outSchema(out), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {
-  for (; relationCount<num; ++relationCount)
-    relations[relationCount] = strdup(rNames[relationCount]);
-}
-
-OptimizerNode::~OptimizerNode() {
-  delete outSchema;
-  for (size_t i=0; i<relationCount; ++i)
-    delete relations[i];
-}
-
-AndList* OptimizerNode::pushSelection(AndList*& alist, Schema* target) {
-  AndList header; header.rightAnd = alist;  // make a list header to
-  // avoid handling special cases deleting the first list element
-  AndList *cur = alist, *pre = &header, *result = NULL;
-  for (; cur; cur = pre->rightAnd)
-    if (containedIn(cur->left, target)) {   // should push
-      pre->rightAnd = cur->rightAnd;
-      cur->rightAnd = result;        // *move* the node to the result list
-      result = cur;        // prepend the new node to result list
-    } else pre = cur;
-  alist = header.rightAnd;  // special case: first element moved
-  return result;
-}
-
-bool OptimizerNode::containedIn(OrList* ors, Schema* target) {
-  for (; ors; ors=ors->rightOr)
-    if (!containedIn(ors->left, target)) return false;
-  return true;
-}
-
-bool OptimizerNode::containedIn(ComparisonOp* cmp, Schema* target) {
-  Operand *left = cmp->left, *right = cmp->right;
-  return (left->code!=NAME || target->Find(left->value)!=-1) &&
-         (right->code!=NAME || target->Find(right->value)!=-1);
-}
-
-LeafNode::LeafNode(AndList*& boolean, AndList*& pushed, char* relName, char* alias, Statistics* inStats):
-  OptimizerNode("SELECT FILE", new Schema(catalog_path, relName, alias), relName, inStats) {
-  childNodeCount = 0;
-  pushed = pushSelection(boolean, outSchema);
-  processingEstimation = stat->Estimate(pushed, relations, relationCount);
-  selfOperand.GrowFromParseTree(pushed, outSchema, recordLiteral);
-}
-
-UnaryNode::UnaryNode(const string& opName, Schema* out, OptimizerNode* opNode, Statistics* inStats):
-  OptimizerNode (opName, out, opNode->relations, opNode->relationCount, inStats), childOpNode(opNode), inPipeId(opNode->outPipeId) {
-    childNodeCount = 1;
-  }
-
-BinaryNode::BinaryNode(const string& opName, OptimizerNode* l, OptimizerNode* r, Statistics* inStats):
-  OptimizerNode (opName, new Schema(*l->outSchema, *r->outSchema), inStats),
-  leftOpNode(l), rightOpNode(r) {
-  childNodeCount = 2;
-  inLeftPipeId = leftOpNode->outPipeId;
-  inRightPipeId = rightOpNode->outPipeId;
-  for (size_t i=0; i<l->relationCount;)
-    relations[relationCount++] = strdup(l->relations[i++]);
-  for (size_t j=0; j<r->relationCount;)
-    relations[relationCount++] = strdup(r->relations[j++]);
-}
-
-ProjectNode::ProjectNode(NameList* atts, OptimizerNode* opNode):
-  UnaryNode("PROJECT", NULL, opNode, NULL), inputAttsCount(opNode->outSchema->GetNumAtts()), numAttsOut(0) {
-  Schema* cSchema = opNode->outSchema;
-  Attribute resultAtts[MAX_ATTRIBUTE_COUNT];
-  FATALIF (cSchema->GetNumAtts()>MAX_ATTRIBUTE_COUNT, "Too many attributes.");
-  for (; atts; atts=atts->next, numAttsOut++) {
-    FATALIF ((retainedAtts[numAttsOut]=cSchema->Find(atts->name))==-1,
-             "Projecting non-existing attribute.");
-    makeAttr(resultAtts[numAttsOut], atts->name, cSchema->FindType(atts->name));
-  }
-  outSchema = new Schema ("", numAttsOut, resultAtts);
-}
-
-DedupNode::DedupNode(OptimizerNode* opNode):
-  UnaryNode("DEDUPLICATION", opNode->outSchema, opNode, NULL), dedupOrder(opNode->outSchema) {}
-
-JoinNode::JoinNode(AndList*& boolean, AndList*& pushed, OptimizerNode* l, OptimizerNode* r, Statistics* inStats):
-  BinaryNode("JOIN", l, r, inStats) {
-  pushed = pushSelection(boolean, outSchema);
-  processingEstimation = stat->Estimate(pushed, relations, relationCount);
-  processingCost = l->processingCost + processingEstimation + r->processingCost;
-  selOperand.GrowFromParseTree(pushed, outSchema, recordLiteral);
-}
-
-SelectPipeNode::SelectPipeNode(CNF selfOperand, char* relation, char* alias, OptimizerNode* opNode):
-  UnaryNode("SELECT PIPE", new Schema(catalog_path, relation, alias), opNode, NULL), selfOperand(selfOperand) {}
-
-GroupByNode::GroupByNode(NameList* gAtts, FuncOperator* parseTree, OptimizerNode* opNode):
-  UnaryNode("GROUP BY", resultSchema(gAtts, parseTree, opNode), opNode, NULL) {
-  orderMakerGrp.growFromParseTree(gAtts, opNode->outSchema);
-  function.GrowFromParseTree (parseTree, *opNode->outSchema);
-}
-
-Schema* GroupByNode::resultSchema(NameList* gAtts, FuncOperator* parseTree, OptimizerNode* opNode) {
+Schema* GroupByNode::resultSchema(NameList* inAtts, FuncOperator* inParseTree, OptimizerNode* inOpNode) {
   Function fun;
   Attribute atts[2][1] = {{{"sum", Int}}, {{"sum", Double}}};
-  Schema* cSchema = opNode->outSchema;
-  fun.GrowFromParseTree (parseTree, *cSchema);
+  Schema* cSchema = inOpNode->outSchema;
+  fun.GrowFromParseTree (inParseTree, *cSchema);
   Attribute resultAtts[MAX_ATTRIBUTE_COUNT];
   FATALIF (1+cSchema->GetNumAtts()>MAX_ATTRIBUTE_COUNT, "Too many attributes.");
   makeAttr(resultAtts[0], "sum", fun.resultType());
   int numAtts = 1;
-  for (; gAtts; gAtts=gAtts->next, numAtts++) {
-    FATALIF (cSchema->Find(gAtts->name)==-1, "Grouping by non-existing attribute.");
-    makeAttr(resultAtts[numAtts], gAtts->name, cSchema->FindType(gAtts->name));
+  for (; inAtts; inAtts=inAtts->next, numAtts++) {
+    FATALIF (cSchema->Find(inAtts->name)==-1, "Grouping by non-existing attribute.");
+    makeAttr(resultAtts[numAtts], inAtts->name, cSchema->FindType(inAtts->name));
   }
   return new Schema ("", numAtts, resultAtts);
 }
 
-WriteNode::WriteNode(FILE* out, OptimizerNode* opNode):
-  UnaryNode("WRITE OUT", opNode->outSchema, opNode, NULL), outFile(out) {}
-
-
-
-
-void SelectPipeNode::printAnnot(ostream& os, size_t level) const {
-  os << "SELECTION CNF: " << endl;
-  selfOperand.Print(); 
-}
-
-void ProjectNode::printAnnot(ostream& os, size_t level) const {
-  // os << keepMe[0];
-  // for (size_t i=1; i<numAttsOut; ++i) os << ',' << keepMe[i];
-  // os << endl;
-}
-
-
-void GroupByNode::printAnnot(ostream& os, size_t level) const {
+void GroupByNode::printAnnot(ostream& os) const {
   os << "OrderMaker: "; (const_cast<OrderMaker*>(&orderMakerGrp))->Print();
   os << "Function: "; (const_cast<Function*>(&function))->Print();
 }
+/*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
-void WriteNode::printAnnot(ostream& os, size_t level) const {
+
+/**
+ * Processing DISTINCT operations based upon the processing cost statistics. 
+*/
+DedupNode::DedupNode(OptimizerNode* inOpNode):
+  UnaryNode("DEDUPLICATION", inOpNode->outSchema, inOpNode, NULL), dedupOrderMaker(inOpNode->outSchema) {}
+
+void Optimizer::processDistinct() {
+  if (distinctAtts) 
+    opRootNode = new DedupNode(opRootNode);
+}
+/*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
+
+
+/**
+ * Writing the final resul based upon the processing cost statistics. 
+*/
+WriteNode::WriteNode(FILE* outFile, OptimizerNode* inOpNode):
+  UnaryNode("WRITE OUT", inOpNode->outSchema, inOpNode, NULL), outFile(outFile) {}
+
+void Optimizer::processWrite() {
+  opRootNode = new WriteNode(stdout, opRootNode);
+}
+
+void WriteNode::printAnnot(ostream& os) const {
   os << "Output to " << outFile << endl;
 }
+/*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
+
+
+/**
+ * 
+*/
+void Optimizer::printNodes(ostream& os) {
+  os << "Number of selects: " << selectQeryCount << endl;
+  os << "Number of joins: " << joinQueryCount << endl;
+  if (groupingAtts) {
+    os << "GROUPING ON ";
+    for (NameList* att = groupingAtts; att; att = att->next)
+      os << att->name << " ";
+    os << endl;
+  }
+  os << "PRINTING TREE IN ORDER:\n\n";
+  OptimizerNode* opNode = opRootNode;
+  printNodesInOrder(opNode, os);
+}
+
+void Optimizer::printNodesInOrder(OptimizerNode* opNode, ostream& os) {
+  if (opNode) {
+    switch(opNode->childNodeCount) {
+      case 0:
+        opNode->print(os);
+        break;
+      
+      case 1: {
+        UnaryNode* temp = (UnaryNode*)opNode;
+        printNodesInOrder(temp->childOpNode, os);
+        opNode->print(os);
+        break;
+      }
+
+      case 2: {
+        BinaryNode* temp = (BinaryNode*)opNode;
+        printNodesInOrder(temp->leftOpNode, os);
+        printNodesInOrder(temp->rightOpNode, os);
+        opNode->print(os);
+        break;
+      }
+    }
+  }
+}
+
+void OptimizerNode::print(ostream& os) const {
+  os << "************" << endl;
+  printOperator(os);
+  printPipe(os);
+  printSchema(os);
+  printAnnot(os);
+  os << "\n";
+}
+
+void OptimizerNode::printOperator(ostream& os) const {
+  os << operand << " operation" << endl;
+}
+
+void OptimizerNode::printSchema(ostream& os) const {
+  os << "Output schema:" << endl;
+  outSchema->print(os);
+}
+/*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/

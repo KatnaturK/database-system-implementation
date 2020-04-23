@@ -8,42 +8,42 @@ PRINTING TREE IN ORDER:
 SELECT FILE operation
 Output pipe: 3
 Output schema:
-  Att0: p.p_partkey int
-  Att1: p.p_name string
-  Att2: p.p_mfgr string
-  Att3: p.p_brand string
-  Att4: p.p_type string
-  Att5: p.p_size int
-  Att6: p.p_container string
-  Att7: p.p_retailprice double
-  Att8: p.p_comment string
+		Att p.p_partkey INT
+		Att p.p_name STRING
+		Att p.p_mfgr STRING
+		Att p.p_brand STRING
+		Att p.p_type STRING
+		Att p.p_size INT
+		Att p.p_container STRING
+		Att p.p_retailprice DOUBLE
+		Att p.p_comment STRING
 
 ************
 SELECT FILE operation
 Output pipe: 1
 Output schema:
-  Att0: s.s_suppkey int
-  Att1: s.s_name string
-  Att2: s.s_address string
-  Att3: s.s_nationkey int
-  Att4: s.s_phone string
-  Att5: s.s_acctbal double
-  Att6: s.s_comment string
+		Att s.s_suppkey INT
+		Att s.s_name STRING
+		Att s.s_address STRING
+		Att s.s_nationkey INT
+		Att s.s_phone STRING
+		Att s.s_acctbal DOUBLE
+		Att s.s_comment STRING
 
 ************
 SELECT PIPE operation
 Input pipe: 1
 Output pipe: 2
 Output schema:
-  Att0: s.s_suppkey int
-  Att1: s.s_name string
-  Att2: s.s_address string
-  Att3: s.s_nationkey int
-  Att4: s.s_phone string
-  Att5: s.s_acctbal double
-  Att6: s.s_comment string
+		Att s.s_suppkey INT
+		Att s.s_name STRING
+		Att s.s_address STRING
+		Att s.s_nationkey INT
+		Att s.s_phone STRING
+		Att s.s_acctbal DOUBLE
+		Att s.s_comment STRING
 SELECTION CNF: 
-( Att 5 from left record > Att 0 from literal record (Double)) 
+( s.s_acctbal > s.s_suppkey ) 
 
 ************
 JOIN operation
@@ -51,33 +51,33 @@ Left input pipe: 3
 Right input pipe: 2
 Output pipe: 4
 Output schema:
-  Att0: p.p_partkey int
-  Att1: p.p_name string
-  Att2: p.p_mfgr string
-  Att3: p.p_brand string
-  Att4: p.p_type string
-  Att5: p.p_size int
-  Att6: p.p_container string
-  Att7: p.p_retailprice double
-  Att8: p.p_comment string
-  Att9: s.s_suppkey int
-  Att10: s.s_name string
-  Att11: s.s_address string
-  Att12: s.s_nationkey int
-  Att13: s.s_phone string
-  Att14: s.s_acctbal double
-  Att15: s.s_comment string
+		Att p.p_partkey INT
+		Att p.p_name STRING
+		Att p.p_mfgr STRING
+		Att p.p_brand STRING
+		Att p.p_type STRING
+		Att p.p_size INT
+		Att p.p_container STRING
+		Att p.p_retailprice DOUBLE
+		Att p.p_comment STRING
+		Att s.s_suppkey INT
+		Att s.s_name STRING
+		Att s.s_address STRING
+		Att s.s_nationkey INT
+		Att s.s_phone STRING
+		Att s.s_acctbal DOUBLE
+		Att s.s_comment STRING
 CNF: 
 
 ************
 SELECT FILE operation
 Output pipe: 0
 Output schema:
-  Att0: ps.ps_partkey int
-  Att1: ps.ps_suppkey int
-  Att2: ps.ps_availqty int
-  Att3: ps.ps_supplycost double
-  Att4: ps.ps_comment string
+		Att ps.ps_partkey INT
+		Att ps.ps_suppkey INT
+		Att ps.ps_availqty INT
+		Att ps.ps_supplycost DOUBLE
+		Att ps.ps_comment STRING
 
 ************
 JOIN operation
@@ -85,38 +85,38 @@ Left input pipe: 4
 Right input pipe: 0
 Output pipe: 5
 Output schema:
-  Att0: p.p_partkey int
-  Att1: p.p_name string
-  Att2: p.p_mfgr string
-  Att3: p.p_brand string
-  Att4: p.p_type string
-  Att5: p.p_size int
-  Att6: p.p_container string
-  Att7: p.p_retailprice double
-  Att8: p.p_comment string
-  Att9: s.s_suppkey int
-  Att10: s.s_name string
-  Att11: s.s_address string
-  Att12: s.s_nationkey int
-  Att13: s.s_phone string
-  Att14: s.s_acctbal double
-  Att15: s.s_comment string
-  Att16: ps.ps_partkey int
-  Att17: ps.ps_suppkey int
-  Att18: ps.ps_availqty int
-  Att19: ps.ps_supplycost double
-  Att20: ps.ps_comment string
+		Att p.p_partkey INT
+		Att p.p_name STRING
+		Att p.p_mfgr STRING
+		Att p.p_brand STRING
+		Att p.p_type STRING
+		Att p.p_size INT
+		Att p.p_container STRING
+		Att p.p_retailprice DOUBLE
+		Att p.p_comment STRING
+		Att s.s_suppkey INT
+		Att s.s_name STRING
+		Att s.s_address STRING
+		Att s.s_nationkey INT
+		Att s.s_phone STRING
+		Att s.s_acctbal DOUBLE
+		Att s.s_comment STRING
+		Att ps.ps_partkey INT
+		Att ps.ps_suppkey INT
+		Att ps.ps_availqty INT
+		Att ps.ps_supplycost DOUBLE
+		Att ps.ps_comment STRING
 CNF: 
-( Att 9 from left record = Att 17 from left record (Int))  AND
-( Att 0 from left record = Att 16 from left record (Int)) 
+( s.s_suppkey = ps.ps_suppkey )  AND
+( p.p_partkey = ps.ps_partkey ) 
 
 ************
 GROUP BY operation
 Input pipe: 5
 Output pipe: 6
 Output schema:
-  Att0: sum double
-  Att1: s.s_suppkey int
+		Att sum DOUBLE
+		Att s.s_suppkey INT
 OrderMaker: NumAtts =     1
   0:     9 Int
 Function: 

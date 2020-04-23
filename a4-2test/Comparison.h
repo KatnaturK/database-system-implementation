@@ -8,6 +8,8 @@
 #include "ComparisonEngine.h"
 #include <stdlib.h>
 
+class Schema;
+
 // This stores an individual comparison that is part of a CNF
 class Comparison {
 
@@ -31,11 +33,9 @@ public:
 	Comparison(const Comparison &copyMe);
 
 	// print to the screen
-	void Print () const;
+	void Print (Schema* outSchema) const;
 };
 
-
-class Schema;
 
 // This structure encapsulates a sort order for records
 class OrderMaker {
@@ -89,7 +89,7 @@ public:
 	int GetSortOrders (OrderMaker &left, OrderMaker &right);
 
 	// print the comparison structure to the screen
-	void Print () const;
+	void Print (Schema* outSchema) const;
 
         // this takes a parse tree for a CNF and converts it into a 2-D
         // matrix storing the same CNF expression.  This function is applicable

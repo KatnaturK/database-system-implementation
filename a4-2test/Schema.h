@@ -26,7 +26,6 @@ class Schema {
 
 	// gives the attributes in the schema
 	int numAtts;
-	Attribute *myAtts;
 
 	// gives the physical location of the binary file storing the relation
 	char *fileName;
@@ -34,6 +33,7 @@ class Schema {
 	friend class Record;
 
 public:
+	Attribute *myAtts;
 
 	// gets the set of attributes, but be careful with this, since it leads
 	// to aliasing!!!

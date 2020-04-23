@@ -24,8 +24,18 @@ Comparison::Comparison(const Comparison &copy_me)
 }
 
 
-void Comparison :: Print () const {
+void Comparison :: Print (Schema* outSchema) const {
 
+	cout << outSchema->myAtts[whichAtt1].name << " ";
+	if (op == LessThan)
+		cout << "< ";
+	else if (op == GreaterThan)
+		cout << "> ";
+	else
+		cout << "= ";
+	cout << outSchema->myAtts[whichAtt2].name << " ";
+
+	/*
 	cout << "Att " << whichAtt1 << " from ";
 
 	if (operand1 == Left)
@@ -59,7 +69,7 @@ void Comparison :: Print () const {
 	else if (attType == Double)
 		cout << "(Double)";
 	else
-		cout << "(String)";
+		cout << "(String)";*/
 }
 
 void OrderMaker::growFromParseTree(NameList* gAtts, Schema* inputSchema) {
@@ -182,14 +192,11 @@ int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 	return left.numAtts;
 }
 
-
-void CNF :: Print () const {
-
+void CNF :: Print (Schema* outSchema) const {
 	for (int i = 0; i < numAnds; i++) {
-		
 		cout << "( ";
 		for (int j = 0; j < orLens[i]; j++) {
-			orList[i][j].Print ();
+			orList[i][j].Print (outSchema);
 			if (j < orLens[i] - 1)
 				cout << " OR ";
 		}

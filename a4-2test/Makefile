@@ -39,8 +39,8 @@ BigQ.o: BigQ.h Pipe.h File.h Record.h
 RelOp.o: RelOp.h Pipe.h DBFile.h Record.h Function.h Pthreadutil.h Errors.h
 Function.o: Function.h Record.h ParseTree.h
 File.o: File.h TwoWayList.h Record.h Schema.h Comparison.h ComparisonEngine.h
-Record.o: Record.h Defs.h ParseTree.h Schema.h File.h Comparison.h ComparisonEngine.h
 Schema.o: Schema.h Record.h File.h Comparison.h ComparisonEngine.h
+Record.o: Record.h Defs.h ParseTree.h Schema.h File.h Comparison.h ComparisonEngine.h
 
 y.tab.o: Parser.y
 	yacc -d Parser.y

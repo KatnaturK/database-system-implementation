@@ -1,17 +1,36 @@
 #ifndef OPTIMIZER_H_
 #define OPTIMIZER_H_
 
+#include <algorithm>
+#include <climits>
+#include <cstring>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include "Comparison.h"
+#include "Defs.h"
+#include "Errors.h"
 #include "Function.h"
 #include "ParseTree.h"
 #include "Schema.h"
 #include "Statistics.h"
+#include "Stl.h"
 
 #define MAX_ATTRIBUTE_COUNT 100
 #define MAX_RELATION_COUNT 12
+
+extern char* catalog_path;
+extern char* dbfile_dir;
+extern char* tpch_dir;
+
+extern struct FuncOperator *finalFunction; // the aggregate function (NULL if no agg)
+extern struct TableList *tables; // the list of tables and aliases in the query
+extern struct AndList *boolean; // the predicate in the WHERE clause
+extern struct NameList *groupingAtts; // grouping atts (NULL if no grouping)
+extern struct NameList *attsToSelect; // the set of attributes in the SELECT (NULL if no such atts)
+extern int distinctAtts; // 1 if there is a DISTINCT in a non-aggregate query 
+extern int distinctFunc;  // 1 if there is a DISTINCT in an aggregate query
 
 using namespace std;
 
@@ -38,8 +57,8 @@ private:
   void sortJoins();
   void ProcessSums();
   void processProjects();
-  void makeDistinct();
-  void makeWrite();
+  void processDistinct();
+  void processWrite();
   int evalOrder(vector<OptimizerNode*> opNodeOperands, Statistics stats, int bestFound);
   void printNodes(ostream& os = cout);
   void printNodesInOrder(OptimizerNode* opNode, ostream& os = cout);
@@ -76,12 +95,12 @@ protected:
   char* relations[MAX_RELATION_COUNT];
   Statistics* stat;
 
-  virtual void print(ostream& os = cout, size_t level = 0) const;
-  virtual void printOperator(ostream& os = cout, size_t level = 0) const;
-  virtual void printSchema(ostream& os = cout, size_t level = 0) const;
-  virtual void printAnnot(ostream& os = cout, size_t level = 0) const = 0;
-  virtual void printPipe(ostream& os, size_t level = 0) const = 0;
-  virtual void printChildren(ostream& os, size_t level = 0) const = 0;
+  virtual void print(ostream& os = cout) const;
+  virtual void printOperator(ostream& os = cout) const;
+  virtual void printSchema(ostream& os = cout) const;
+  virtual void printAnnot(ostream& os = cout) const = 0;
+  virtual void printPipe(ostream& os) const = 0;
+  virtual void printChildren(ostream& os) const = 0;
 
   static AndList* pushSelection(AndList*& alist, Schema* target);
   static bool containedIn(OrList* ors, Schema* target);
@@ -95,9 +114,9 @@ class LeafNode: public OptimizerNode {
   Record recordLiteral;
 
   bool hasCNF() {return !selfOperand.isEmpty();}
-  void printAnnot(ostream& os = cout, size_t level = 0) const;
-  void printPipe(ostream& os, size_t level) const;
-  void printChildren(ostream& os, size_t level) const {}
+  void printAnnot(ostream& os = cout) const;
+  void printPipe(ostream& os) const;
+  void printChildren(ostream& os) const {}
 
 public:
   CNF selfOperand;
@@ -112,8 +131,8 @@ protected:
 
   int inPipeId;
 
-  void printPipe(ostream& os, size_t level) const;
-  void printChildren(ostream& os, size_t level) const { childOpNode->print(os, level+1); }
+  void printPipe(ostream& os) const;
+  void printChildren(ostream& os) const { childOpNode->print(os); }
   
 public:
   OptimizerNode* childOpNode;
@@ -128,9 +147,9 @@ protected:
 
   int inLeftPipeId, inRightPipeId;
 
-  void printPipe(ostream& os, size_t level) const;
-  void printChildren(ostream& os, size_t level) const
-  { leftOpNode->print(os, level+1); rightOpNode->print(os, level+1); }
+  void printPipe(ostream& os) const;
+  void printChildren(ostream& os) const
+  { leftOpNode->print(os); rightOpNode->print(os); }
 
 public:
   OptimizerNode* leftOpNode;
@@ -144,16 +163,16 @@ class ProjectNode: private UnaryNode {
   int retainedAtts[MAX_ATTRIBUTE_COUNT];
   int inputAttsCount, numAttsOut;
   
-  void printAnnot(ostream& os = cout, size_t level = 0) const;  
+  void printAnnot(ostream& os = cout) const;  
 };
 
 class DedupNode: private UnaryNode {
   DedupNode(OptimizerNode* opNode);
 
   friend class Optimizer;
-  OrderMaker dedupOrder;
+  OrderMaker dedupOrderMaker;
 
-  void printAnnot(ostream& os = cout, size_t level = 0) const {}
+  void printAnnot(ostream& os = cout) const {}
 };
 
 class GroupByNode: private UnaryNode {
@@ -164,7 +183,7 @@ class GroupByNode: private UnaryNode {
   Function function;
 
   Schema* resultSchema(NameList* attsList, FuncOperator* parseTree, OptimizerNode* opNode);
-  void printAnnot(ostream& os = cout, size_t level = 0) const;
+  void printAnnot(ostream& os = cout) const;
 };
 
 class JoinNode: private BinaryNode {
@@ -174,7 +193,7 @@ class JoinNode: private BinaryNode {
   CNF selOperand;
   Record recordLiteral;
 
-  void printAnnot(ostream& os = cout, size_t level = 0) const;
+  void printAnnot(ostream& os = cout) const;
 };
 
 class SelectPipeNode: private UnaryNode {
@@ -185,7 +204,7 @@ class SelectPipeNode: private UnaryNode {
   CNF selfOperand;
   Record recordLiteral;
 
-  void printAnnot(ostream& os = cout, size_t level = 0) const;
+  void printAnnot(ostream& os = cout) const;
 };
 
 class SumNode: private UnaryNode {
@@ -195,7 +214,7 @@ class SumNode: private UnaryNode {
   Function function;
 
   Schema* resultSchema(FuncOperator* parseTree, OptimizerNode* opNode);
-  void printAnnot(ostream& os = cout, size_t level = 0) const;
+  void printAnnot(ostream& os = cout) const;
 };
 
 class WriteNode: private UnaryNode {
@@ -204,8 +223,8 @@ class WriteNode: private UnaryNode {
   friend class Optimizer;
   FILE* outFile;
 
-  void print(ostream& os = cout, size_t level = 0) const {}
-  void printAnnot(ostream& os = cout, size_t level = 0) const;
+  void print(ostream& os = cout) const {}
+  void printAnnot(ostream& os = cout) const;
 };
 
 #endif
