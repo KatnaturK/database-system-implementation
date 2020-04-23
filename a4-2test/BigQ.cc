@@ -1,167 +1,198 @@
-#include <climits>
-#include <unistd.h>
-#include <cstring>
+#include <string>
+#include <cstdlib>
+#include <sstream>
+
 #include "BigQ.h"
 
-using namespace std;
+//Comparison function object
+Sorter::Sorter(OrderMaker &sortorder): _sortorder(sortorder){}
 
-char tempFilePath[PATH_MAX];
-
-BigQ::BigQ(Pipe &in, Pipe &out, OrderMaker &orderMaker, int runlen1) {
-    inPipe = &in;
-    outPipe = &out;
-    runlen = runlen1;
-    maker = &orderMaker;
-    pthread_create(&worker_thread, NULL, workerThread, (void *) this);
-}
-BigQ::BigQ(){
-
+bool Sorter::operator()(Record *i, Record *j){
+		ComparisonEngine comp;
+		if(comp.Compare(i, j, &_sortorder) < 0)
+			return true;
+		else 
+			return false;
 }
 
-BigQ::~BigQ() {
+Sorter2::Sorter2(OrderMaker &sortorder): _sortorder(sortorder){}
+
+bool Sorter2::operator()(pair<int, Record *> i, pair<int, Record *> j){
+		ComparisonEngine comp;
+		if(comp.Compare((i.second), (j.second), &_sortorder) < 0)
+			return false;
+		else 
+			return true;
 }
 
-void BigQ::phaseOne() {
-    Record tempRecord;
-    Compare comparator = Compare(*maker);
+int BigQ::cnt = 0;
 
-    const long maxSize = PAGE_SIZE * runlen;
-
-    long curSize = 0;
-
-    vector<Record *> recordList;
-    Page page;
-    int page_index=0;
-
-    while (inPipe->Remove(&tempRecord)) {
-        Record *record = new Record();
-        record->Copy(&tempRecord);
-
-
-//        curSize += record->GetLength();
-
-        if(!page.Append(&tempRecord)){
-            if (++page_index == runlen){
-                sort(recordList.begin(), recordList.end(), comparator);
-                dumpSortedList(recordList);
-                page_index=0;
-            }
-            page.EmptyItOut();
-            page.Append(&tempRecord);
-        }
-
-//        if (curSize >= maxSize) {
-//            curSize = 0;
-//            sort(recordList.begin(), recordList.end(), comparator);
-//            dumpSortedList(recordList);
-//        }
-        recordList.emplace_back(record);
-    }
-//    cout<<"Current Record Size: "<<curSize<<endl;
-    if (recordList.empty()) {
-        outPipe->ShutDown();
-        file.Close();
-        pthread_exit(NULL);
-    }
-
-    sort(recordList.begin(), recordList.end(), comparator);
-//    cout<<"RecordList: "<<recordList.size()<<endl;
-    dumpSortedList(recordList);
-//    cout<<"Sucess of Dumping Sorted List"<<endl;
+const char* BigQ::tmpfName() {
+  const size_t LEN = 10;
+  std::ostringstream oss;
+  char rstr[LEN];
+  genRandom(rstr, LEN);
+  oss << "biq" << (++cnt) << rstr << ".tmp";
+  std::string name = oss.str();
+  return name.c_str();
 }
 
-void BigQ::phaseTwo() {
-//    cout <<"phase2: " << blockNum <<endl;
-    vector<Page> tempPage(blockNum);
-    priority_queue<IndexedRecord *, vector<IndexedRecord *>, IndexedRecordCompare> priorityQueue(*maker);
-
-    for (int i = 0; i < blockNum; i++) {
-        file.GetPage(&tempPage[i], blockStartOffset[i]++);
-        IndexedRecord *indexedRecord = new IndexedRecord();
-        indexedRecord->blockIndex = i;
-        tempPage[i].GetFirst(&(indexedRecord->record));
-        priorityQueue.emplace(indexedRecord);
-    }
-
-    while (!priorityQueue.empty()) {
-        IndexedRecord *indexedRecord = priorityQueue.top();
-        priorityQueue.pop();
-        int blockIndex = indexedRecord->blockIndex;
-        outPipe->Insert(&(indexedRecord->record));
-        if (tempPage[blockIndex].GetFirst(&(indexedRecord->record))) {
-            priorityQueue.emplace(indexedRecord);
-        } else if (blockStartOffset[blockIndex] < blockEndOffset[blockIndex]) {
-            file.GetPage(&tempPage[blockIndex], blockStartOffset[blockIndex]++);
-            tempPage[blockIndex].GetFirst(&(indexedRecord->record));
-            priorityQueue.emplace(indexedRecord);
-        } else {
-            delete indexedRecord;
-        }
-    }
+BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen):
+Qin(in), Qout(out), Qsortorder(sortorder), Qrunlen(runlen), mysorter(sortorder), mysorter2(sortorder) {
+	
+	//create worker thread
+	int rc = pthread_create(&worker, NULL, Working, (void *)this);
+	if(rc){
+		printf("Error creating worker thread! Return %d\n", rc);
+		exit(-1);
+	}
+	curPage = new Page();
+	theFile = new File();
+	theFile->Open(0, (char*)tmpfName());  // need a random name otherwise two or more bigq's would crash
 }
 
-
-void BigQ::dumpSortedList(vector<Record *> &recordList) {
-    Page outPage;
-    blockStartOffset.push_back(file.GetLength() - 1);
-    for (auto rec : recordList) {
-        if (!outPage.Append(rec)) {
-            file.AddPage(&outPage, file.GetLength() - 1);
-            outPage.EmptyItOut();
-            outPage.Append(rec);
-            delete rec;
-            rec = NULL;
-        }
-    }
-
-    file.AddPage(&outPage, file.GetLength() - 1);
-    blockEndOffset.push_back(file.GetLength() - 1);
-    ++blockNum;
-    recordList.clear();
+BigQ::~BigQ () {
+	theFile->Close();
+	delete curPage;
+	delete theFile;
 }
 
-void *BigQ::workerThread(void *arg) {
-    BigQ *bigQ = (BigQ *) arg;
+void * BigQ::Working(void *big){
+	BigQ *inst = (BigQ *)big;
 
-    bigQ->init();
+	// read data from in pipe sort them into runlen pages
+	Record temp;
+	int curSizeInBytes = 0;
+	int curPageNum = 0;
 
-    bigQ->phaseOne();
-//    clog << "bigq: phase-1 completed.." << endl;
+	vector<Record *> record_bunch;
+	vector<int> runhead;
 
-    bigQ->phaseTwo();
-//    clog << "bigq: phase-2 completed.." << endl;
+	while((inst->Qin).Remove(&temp)){
 
-    bigQ->close();
-    remove(tempFilePath);
-    pthread_exit(NULL);
-}
+		char *b = temp.GetBits();
 
-void BigQ::init() {
-    if (getcwd(tempFilePath, sizeof(tempFilePath)) != NULL) {
-        strcat(tempFilePath, "/temp/tmp");
-        strcat(tempFilePath, getRandStr(10).c_str());
-    } else {
-        cerr << "error while getting curent dir" << endl;
-        exit(-1);
-    }
-    file.Open(0, tempFilePath);
-    file.AddPage(new Page(), -1);
-}
+		if(curSizeInBytes + ((int *)b)[0] < (PAGE_SIZE -4) * inst->Qrunlen){
+			//Read to one Run
+			Record *toput = new Record();
+			toput->Consume(&temp);
+			record_bunch.push_back(toput);
+			curSizeInBytes += ((int *)b)[0];
+			continue;
 
-void BigQ::close() {
-    outPipe->ShutDown();
-    file.Close();
-}
+		}else{
+			//Sort and Write one Run
+			sort (record_bunch.begin(), record_bunch.end(), inst->mysorter);
 
-string BigQ::getRandStr(int len)
-{
-    static string charset = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    string result;
-    result.resize(len);
+			runhead.push_back(curPageNum);
 
-    for (int i = 0; i < len; i++) {
-        result[i] = charset[rand() % charset.length()];
-    }
+			vector<Record *>::iterator it=record_bunch.begin();
+			while(it!=record_bunch.end()){
 
-    return result;
+				if(!(inst->curPage)->Append((*it))){
+					(inst->theFile)->addPage(inst->curPage);
+					(inst->curPage)->EmptyItOut();
+					curPageNum++;
+				}else{
+					it++;
+				}
+
+			}
+			if(!(inst->curPage)->empty()){
+				(inst->theFile)->addPage(inst->curPage);
+				(inst->curPage)->EmptyItOut();
+				curPageNum++;
+			}
+	
+			//Free Space
+			for(int i=0; i<record_bunch.size(); i++){
+				delete record_bunch[i];
+			}
+			//Push the one record before write
+			record_bunch.clear();
+			Record *toput = new Record();
+			toput->Consume(&temp);
+			record_bunch.push_back(toput);
+			curSizeInBytes = 0;	
+		}
+
+	}
+
+	if(!record_bunch.empty()){
+		//Sort and Write Last Run
+			sort (record_bunch.begin(), record_bunch.end(), inst->mysorter);
+
+			runhead.push_back(curPageNum);
+
+			vector<Record *>::iterator it=record_bunch.begin();
+			while(it!=record_bunch.end()){
+
+				if(!(inst->curPage)->Append((*it))){
+					(inst->theFile)->addPage(inst->curPage);
+					(inst->curPage)->EmptyItOut();
+					curPageNum++;
+				}else{
+					it++;
+				}
+
+			}
+			if(!(inst->curPage)->empty()){
+				(inst->theFile)->addPage(inst->curPage);
+				(inst->curPage)->EmptyItOut();
+				curPageNum++;
+			}	
+
+			//Free Space
+			for(int i=0; i<record_bunch.size(); i++){
+				delete record_bunch[i];
+			}
+			//Push the one record before write
+			record_bunch.clear();
+			runhead.push_back(curPageNum);//As sentinel for the last run.
+	}
+
+
+	// Construct priority queue over sorted runs and dump sorted data 
+ 	// into the out pipe
+	
+ 	priority_queue<pair<int, Record*>, vector<pair<int, Record*> >, Sorter2> PQueue(Sorter2(inst->Qsortorder));
+ 	vector<int> runcur(runhead);
+ 	vector<Page *> runpagelist;
+
+ 	for(int i=0; i<runhead.size()-1; i++){
+ 		Page *temp_P = new Page();
+ 		(inst->theFile)->GetPage(temp_P, runhead[i]);
+ 		Record *temp_R = new Record();
+ 		temp_P->GetFirst(temp_R);
+
+ 		PQueue.push(make_pair(i,temp_R));
+ 		runpagelist.push_back(temp_P);
+ 	}
+ 	while(!PQueue.empty()){
+ 		//POP
+ 		int temp_I = PQueue.top().first;
+ 		Record *temp_R = PQueue.top().second;
+ 		PQueue.pop();
+ 		(inst->Qout).Insert(temp_R);
+
+ 		//Insert from Next run head
+ 		if(!runpagelist[temp_I]->GetFirst(temp_R)){
+ 			if(++runcur[temp_I]<runhead[temp_I+1]){
+				runpagelist[temp_I]->EmptyItOut();
+ 				(inst->theFile)->GetPage(runpagelist[temp_I], runcur[temp_I]);
+ 				runpagelist[temp_I]->GetFirst(temp_R);
+ 				PQueue.push(make_pair(temp_I,temp_R));
+ 			}
+ 		}else{
+ 			PQueue.push(make_pair(temp_I,temp_R));
+ 		}
+		
+
+ 	}
+	for(int i=0; i<runpagelist.size(); i++){
+		delete runpagelist[i];
+	}
+    // finally shut down the out pipe
+	(inst->Qout).ShutDown ();
+
 }

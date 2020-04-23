@@ -1,8 +1,8 @@
 #include "Schema.h"
 #include <string.h>
 #include <stdio.h>
-#include <iostream>
 #include <stdlib.h>
+#include <iostream>
 
 int Schema :: Find (char *attName) {
 
@@ -60,7 +60,19 @@ Schema :: Schema (char *fpath, int num_atts, Attribute *atts) {
 	}
 }
 
-Schema :: Schema (char *fName, char *relName) {
+Schema::Schema(const Schema& left, const Schema& right):
+  numAtts(left.numAtts+right.numAtts), myAtts(new Attribute[numAtts]), fileName(NULL) {
+  for (size_t i = 0; i < left.numAtts; ++i) {
+    myAtts[i].name = strdup(left.myAtts[i].name);
+    myAtts[i].myType = left.myAtts[i].myType;
+  }
+  for (size_t j = 0; j < right.numAtts; ++j) {
+    myAtts[left.numAtts+j].name = strdup(right.myAtts[j].name);
+    myAtts[left.numAtts+j].myType = right.myAtts[j].myType;
+  }
+}
+
+Schema :: Schema (char *fName, char *relName, const char* alias) {
 
 	FILE *foo = fopen (fName, "r");
 	
@@ -135,7 +147,9 @@ Schema :: Schema (char *fName, char *relName) {
 	for (int i = 0; i < numAtts; i++ ) {
 
 		// read in the attribute name
-		fscanf (foo, "%s", space);	
+                strcpy (space, alias);
+                strcat (space, ".");
+                fscanf (foo, "%s", space+strlen(space));
 		myAtts[i].name = strdup (space);
 
 		// read in the attribute type
@@ -155,64 +169,14 @@ Schema :: Schema (char *fName, char *relName) {
 	fclose (foo);
 }
 
+void Schema::print(std::ostream& os) const {
+  const char* typenames[3] = {"int", "double", "string"};
+  for (size_t i = 0; i < numAtts; ++i)
+    os << "  Att" << i << ": " << myAtts[i].name << " " << typenames[myAtts[i].myType] << endl;
+}
+
 Schema :: ~Schema () {
 	delete [] myAtts;
 	myAtts = 0;
 }
 
-
-void Schema :: Print () {
-
-    string typeName;
-
-    for (int i = 0; i < numAtts; i++) {
-
-        switch (myAtts[i].myType) {
-
-            case Int :
-                typeName = string ("Int");
-                break;
-
-            case Double :
-                typeName = string ("Double");
-                break;
-
-            case String :
-                typeName = string ("String");
-                break;
-
-            default :// should never come here!!!!!
-                cout << "Wrong Type! " << myAtts[i].myType << endl;
-
-        }
-
-        cout << myAtts[i].name << " : " <<  typeName << endl;
-
-    }
-
-}
-
-Schema* Schema :: Project (NameList* attsLeft, int* &keepMe) {
-    int numAttsOutput = 0;
-    NameList *cur = attsLeft;
-    while (cur) {
-        ++numAttsOutput;
-        cur = cur->next;
-    }
-    Attribute *resAtts = new Attribute[numAttsOutput];
-    keepMe = new int[numAttsOutput];
-
-    NameList* tmpList = attsLeft;
-
-    int i = 0;
-    while(tmpList)
-    {
-        resAtts[i].name = tmpList->name;
-        resAtts[i].myType = FindType(tmpList->name);
-        keepMe[i] = Find(tmpList->name);
-        tmpList = tmpList->next;
-        ++i;
-    }
-
-    return new Schema("projectedSchema", numAttsOutput, resAtts);
-}

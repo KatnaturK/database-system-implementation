@@ -2,70 +2,71 @@
 #define BIGQ_H
 #include <pthread.h>
 #include <iostream>
+#include <queue>
+#include <algorithm>
 #include "Pipe.h"
 #include "File.h"
 #include "Record.h"
-#include "Comparison.h"
 
-#include <vector>
-#include <queue>
-#include <algorithm>
+class Page;
+class File;
 
-class BigQ
-{
 
+using namespace std;
+
+class Sorter{
 public:
-
-    BigQ (Pipe &in, Pipe &out, OrderMaker &orderMaker, int runlen);
-    BigQ();
-    ~ BigQ();
-
-    static void* workerThread(void* arg);
-    void dumpSortedList(std::vector<Record*>& recordList);
-    void phaseOne();
-    void phaseTwo();
-    string getRandStr(int length);
-    void init();
-    void close();
-    Pipe* inPipe;
-    Pipe* outPipe;
-    int blockNum = 0;
-    vector<off_t> blockStartOffset;
-    vector<off_t> blockEndOffset;
-    File file;
-
-
+	Sorter(OrderMaker &sortorder);
+	bool operator()(Record* i, Record* j) ;
 private:
-    OrderMaker* maker;
-    int runlen;
-
-    pthread_t worker_thread;
-
-    class Compare{
-        ComparisonEngine CmpEng;
-        OrderMaker& CmpOrder;
-
-    public:
-        Compare(OrderMaker& orderMaker): CmpOrder(orderMaker) {}
-        bool operator()(Record* a, Record* b){return CmpEng.Compare(a, b, &CmpOrder) < 0;}
-    };
-
-    class IndexedRecord{
-    public:
-        Record record;
-        int blockIndex;
-    };
-
-    class IndexedRecordCompare{
-        ComparisonEngine comparisonEngine;
-        OrderMaker& orderMaker;
-
-    public:
-        IndexedRecordCompare(OrderMaker& orderMaker): orderMaker(orderMaker) {}
-
-        bool operator()(IndexedRecord* a, IndexedRecord* b){return comparisonEngine.Compare(&(a->record), &(b->record), &orderMaker) > 0;}
-    };
+		OrderMaker & _sortorder;
 };
 
+class Sorter2{
+public:
+	Sorter2(OrderMaker &sortorder);
+	bool operator()(pair<int, Record *> i, pair<int, Record *> j) ;
+private:
+		OrderMaker & _sortorder;
+};
+
+
+// make sure to set a seed before generating the temporary file.
+class BigQ {
+public:
+	Pipe &Qin;
+	Pipe &Qout;
+	OrderMaker &Qsortorder;
+	int Qrunlen;
+	Sorter mysorter;
+	Sorter2 mysorter2;
+
+	Page *curPage;
+	File *theFile;
+	
+	pthread_t worker;
+public:
+
+	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);
+	~BigQ ();
+
+	static void *Working(void *biq);
+
+private:
+  static int cnt;
+  static const char* tmpfName();
+  static void genRandom(char *s, const int len) {
+    static const char alphanum[] =
+      "0123456789"
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      "abcdefghijklmnopqrstuvwxyz";
+
+    for (int i = 0; i < len; ++i) {
+      s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+
+    s[len] = 0;
+  }
+};
 
 #endif

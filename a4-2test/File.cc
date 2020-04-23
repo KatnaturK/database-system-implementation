@@ -9,14 +9,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-Page :: Page () {
-	curSizeInBytes = sizeof (int);
-	numRecs = 0;
 
+
+Page :: Page(): curSizeInBytes(sizeof(int)), numRecs(0) {
 	myRecs = new (std::nothrow) TwoWayList<Record>;
 	if (myRecs == NULL)
 	{
-		cout << "ERROR : Not enough memory. EXIT !!!\n";
+		cerr << "ERROR : Not enough memory. EXIT !!!\n";
 		exit(1);
 	}
 }
@@ -98,7 +97,7 @@ void Page :: ToBinary (char *bits) {
 		memcpy (curPos, b, ((int *) b)[0]);
 		curPos += ((int *) b)[0];
 
-		// and printRecursively the list
+		// and traverse the list
 		myRecs->Advance ();
 	}
 }
@@ -108,7 +107,6 @@ void Page :: FromBinary (char *bits) {
 
 	// first read the number of records on the page
 	numRecs = ((int *) bits)[0];
-	//subi //cerr << " numRecs in page " << numRecs << endl;
 
 	// sanity check
 	if (numRecs > 1000000 || numRecs < 0) {
@@ -166,7 +164,6 @@ void File :: GetPage (Page *putItHere, off_t whichPage) {
 
 	// this is because the first page has no data
 	whichPage++;
-	//subi// cerr << "get_pg " << whichPage << " file_sz " << curLength << endl;
 
 	if (whichPage >= curLength) {
 		cerr << "whichPage " << whichPage << " length " << curLength << endl;
@@ -191,7 +188,6 @@ void File :: GetPage (Page *putItHere, off_t whichPage) {
 
 
 void File :: AddPage (Page *addMe, off_t whichPage) {
-
 	// this is because the first page has no data
 	whichPage++;
 
@@ -209,12 +205,11 @@ void File :: AddPage (Page *addMe, off_t whichPage) {
 		// set the size
 		curLength = whichPage + 1;	
 	}
-
 	// now write the page
 	char *bits = new (std::nothrow) char[PAGE_SIZE];
 	if (bits == NULL)
 	{
-		cout << "ERROR : Not enough memory. EXIT !!!\n";
+		cerr << "ERROR : Not enough memory. EXIT !!!\n";
 		exit(1);
 	}
 
@@ -222,14 +217,13 @@ void File :: AddPage (Page *addMe, off_t whichPage) {
 	lseek (myFilDes, PAGE_SIZE * whichPage, SEEK_SET);
 	write (myFilDes, bits, PAGE_SIZE);
 	delete [] bits;
-#ifdef F_DEBUG
+#ifdef DEBUG
 	cerr << " File: curLength " << curLength << " whichPage " << whichPage << endl;
 #endif
 }
 
 
 void File :: Open (int fileLen, char *fName) {
-
 	// figure out the flags for the system open call
         int mode;
         if (fileLen == 0)
@@ -240,7 +234,7 @@ void File :: Open (int fileLen, char *fName) {
 	// actually do the open
         myFilDes = open (fName, mode, S_IRUSR | S_IWUSR);
 
-#ifdef verbose
+#ifdef DEBUG
 	cout << "Opening file " << fName << " with "<< curLength << " pages.\n";
 #endif
 
@@ -263,12 +257,6 @@ void File :: Open (int fileLen, char *fName) {
 
 }
 
-
-off_t File :: GetLength () {
-	return curLength;
-}
-
-
 int File :: Close () {
 
 	// write out the current length in pages
@@ -282,5 +270,3 @@ int File :: Close () {
 	return curLength;
 	
 }
-
-

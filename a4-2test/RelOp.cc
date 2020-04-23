@@ -1,724 +1,230 @@
+#include <stdio.h>
+#include <iostream>
+#include <cstdlib>
+
 #include "RelOp.h"
+#include "Record.h"
+#include "Errors.h"
+#include "HeapFile.h"
 
-void SelectFile::Run(DBFile &inFile, Pipe &outPipe, CNF &selOp, Record &literal) {
-    OpArgs *opArgs = new OpArgs(inFile, outPipe, selOp, literal);
-    pthread_create(&thread, NULL, workerThread, opArgs);
+#define FOREACH_INPIPE(rec, in)                 \
+  Record rec;                                   \
+  while (in->Remove(&rec))
+
+#define FOREACH_INFILE(rec, f)                  \
+  f.MoveFirst();                                \
+  Record rec;                                   \
+  while (f.GetNext(rec))
+
+#ifndef END_FOREACH
+#define END_FOREACH }
+#endif
+
+void SelectFile::Run (DBFile& inFile, Pipe& outPipe, CNF& selOp, Record& literal) {
+  PACK_ARGS4(param, &inFile, &outPipe, &selOp, &literal);
+  FATALIF(create_joinable_thread(&worker, work, param), "Error creating worker thread.");
 }
 
-void *SelectFile::workerThread(void *arg) {
-    OpArgs *opArgs = (OpArgs *) arg;
-    Record temp;
+void* SelectFile::work(void* param) {
+  UNPACK_ARGS4(Args, param, in, out, sel, lit);
+  Record next;
+  in->MoveFirst();
+  while (in->GetNext(next, *sel, *lit)) out->Insert(&next);
+  out->ShutDown();
+}
 
-    while (opArgs->inFile->GetNext(temp)) {
-        if (opArgs->compEng->Compare(&temp, opArgs->literal, opArgs->selOp)) {
-            opArgs->outPipe->Insert(&temp);
-        }
+void SelectPipe::Run (Pipe& inPipe, Pipe& outPipe, CNF& selOp, Record& literal) {
+  PACK_ARGS4(param, &inPipe, &outPipe, &selOp, &literal);
+  FATALIF(create_joinable_thread(&worker, work, param), "Error creating worker thread.");
+}
+
+void* SelectPipe::work(void* param) {
+  UNPACK_ARGS4(Args, param, in, out, sel, lit);
+  ComparisonEngine cmp;
+  FOREACH_INPIPE(rec, in) if(cmp.Compare(&rec, lit, sel)) out->Insert(&rec);
+  out->ShutDown();
+}
+
+void Project::Run(Pipe& inPipe, Pipe& outPipe, int* keepMe, int numAttsInput, int numAttsOutput) {
+  PACK_ARGS5(param, &inPipe, &outPipe, keepMe, numAttsInput, numAttsOutput);
+  FATALIF(create_joinable_thread(&worker, work, param), "Error creating worker thread.");
+}
+
+void* Project::work(void* param) {
+  UNPACK_ARGS5(Args, param, in, out, keepMe, numAttsIn, numAttsOut);
+  FOREACH_INPIPE(rec, in) {
+    rec.Project(keepMe, numAttsOut, numAttsIn);
+    out->Insert(&rec);
+  }
+  out->ShutDown();
+}
+
+void Sum::Run (Pipe& inPipe, Pipe& outPipe, Function& computeMe) {
+  PACK_ARGS3(param, &inPipe, &outPipe, &computeMe);
+  FATALIF(create_joinable_thread(&worker, work, param), "Error creating worker thread.");
+}
+
+void* Sum::work(void* param) {
+  UNPACK_ARGS3(Args, param, in, out, func);
+  if (func->resultType() == Int) doSum<int>(in, out, func);
+  else doSum<double>(in, out, func);
+  out->ShutDown();
+}
+
+void Join::Run(Pipe& inPipeL, Pipe& inPipeR, Pipe& outPipe, CNF& selOp, Record& literal) {
+  PACK_ARGS6(param, &inPipeL, &inPipeR, &outPipe, &selOp, &literal, runLength);
+  FATALIF(create_joinable_thread(&worker, work, param), "Error creating worker thread.");
+}
+
+void* Join::work(void* param) {
+  UNPACK_ARGS6(Args, param, pleft, pright, pout, sel, lit, runLen);
+  OrderMaker orderLeft, orderRight;
+  if (sel->GetSortOrders(orderLeft, orderRight)) 
+    sortMergeJoin(pleft, &orderLeft, pright, &orderRight, pout, sel, lit, runLen);
+  else nestedLoopJoin(pleft, pright, pout, sel, lit, runLen);
+  pout->ShutDown();
+}
+  
+void Join::sortMergeJoin(Pipe* pleft, OrderMaker* orderLeft, Pipe* pright, OrderMaker* orderRight, Pipe* pout,
+                          CNF* sel, Record* literal, size_t runLen) {
+  ComparisonEngine cmp;
+  Pipe sortedLeft(PIPE_SIZE), sortedRight(PIPE_SIZE);
+  BigQ qLeft(*pleft, sortedLeft, *orderLeft, runLen), qRight(*pright, sortedRight, *orderRight, runLen);
+  Record fromLeft, fromRight, merged, previous;
+  JoinBuffer buffer(runLen);
+
+  // two-way merge join
+  for (bool moreLeft = sortedLeft.Remove(&fromLeft), moreRight = sortedRight.Remove(&fromRight); moreLeft && moreRight; ) {
+    int result = cmp.Compare(&fromLeft, orderLeft, &fromRight, orderRight);
+    if (result<0) moreLeft = sortedLeft.Remove(&fromLeft);
+    else if (result>0) moreRight = sortedRight.Remove(&fromRight);
+    else {       // equal attributes: fromLeft == fromRight ==> do joining
+      buffer.clear();
+      for(previous.Consume(&fromLeft);
+          (moreLeft=sortedLeft.Remove(&fromLeft)) && cmp.Compare(&previous, &fromLeft, orderLeft)==0; previous.Consume(&fromLeft))
+        FATALIF(!buffer.add(previous), "Join buffer exhausted.");   // gather records of the same value
+      FATALIF(!buffer.add(previous), "Join buffer exhausted.");     // remember the last one
+      do {       // Join records from right pipe
+        FOREACH(rec, buffer.buffer, buffer.nrecords)
+          if (cmp.Compare(&rec, &fromRight, literal, sel)) {   // actural join
+            merged.CrossProduct(&rec, &fromRight);
+            pout->Insert(&merged);
+          }
+        END_FOREACH
+      } while ((moreRight=sortedRight.Remove(&fromRight)) && cmp.Compare(buffer.buffer, orderLeft, &fromRight, orderRight)==0);    // read all records from right pipe with equal value
     }
-    opArgs->outPipe->ShutDown();
-    pthread_exit(NULL);
+  }
 }
 
-void SelectFile::WaitUntilDone() {
-    pthread_join(thread, NULL);
-}
+void Join::nestedLoopJoin(Pipe* pleft, Pipe* pright, Pipe* pout, CNF* sel, Record* literal, size_t runLen) {
+  DBFile rightFile;
+  dumpFile(*pright, rightFile);
+  JoinBuffer leftBuffer(runLen);
 
-void SelectFile::Use_n_Pages(int runlen) {
-    n_pages = runlen;
-}
-
-
-void SelectPipe::Run(Pipe &inPipe, Pipe &outPipe, CNF &selOp, Record &literal) {
-    OpArgs *opArgs = new OpArgs(inPipe, outPipe, selOp, literal);
-    pthread_create(&thread, NULL, workerThread, opArgs);
-}
-
-void *SelectPipe::workerThread(void *arg) {
-    OpArgs *opArgs = (OpArgs *) arg;
-    Record temp;
-
-    while (opArgs->inPipe->Remove(&temp)) {
-        if (opArgs->compEng->Compare(&temp, opArgs->literal, opArgs->selOp)) {
-            opArgs->outPipe->Insert(&temp);
-        }
+  // nested loops join
+  FOREACH_INPIPE(rec, pleft)
+    if (!leftBuffer.add(rec)) {  // buffer full ==> do join
+      joinBuf(leftBuffer, rightFile, *pout, *literal, *sel);
+      leftBuffer.clear();       // start next chunk of LEFT
+      leftBuffer.add(rec);
     }
-    opArgs->outPipe->ShutDown();
-    pthread_exit(NULL);
+  joinBuf(leftBuffer, rightFile, *pout, *literal, *sel);   // join the last buffer
+  rightFile.Close();
 }
 
+void Join::joinBuf(JoinBuffer& buffer, DBFile& file, Pipe& out, Record& literal, CNF& selOp) {
+  ComparisonEngine cmp;
+  Record merged;
 
-void SelectPipe::WaitUntilDone() {
-    pthread_join(thread, NULL);
+  FOREACH_INFILE(fromFile, file) {
+    FOREACH(fromBuffer, buffer.buffer, buffer.nrecords)
+      if (cmp.Compare(&fromBuffer, &fromFile, &literal, &selOp)) {   // actural join
+        merged.CrossProduct(&fromBuffer, &fromFile);
+        out.Insert(&merged);
+      }
+    END_FOREACH
+  }
 }
 
-void SelectPipe::Use_n_Pages(int runlen) {
-    n_pages = runlen;
+void Join::dumpFile(Pipe& in, DBFile& out) {
+  const int RLEN = 10;
+  char rstr[RLEN];
+  Rstring::gen(rstr, RLEN);  // need a random name otherwise two or more joins would crash
+  std::string tmpName("join");
+  tmpName = tmpName + rstr + ".tmp";
+  out.Create((char*)tmpName.c_str(), HEAP, NULL);
+  Record rec;
+  while (in.Remove(&rec)) out.Add(rec);
 }
 
-void Project::Run(Pipe &inPipe, Pipe &outPipe, int *keepMe, int numAttsInput, int numAttsOutput) {
-    OpArgs *opArgs = new OpArgs(inPipe, outPipe, keepMe, numAttsInput, numAttsOutput);
-    pthread_create(&thread, NULL, workerThread, opArgs);
+void DuplicateRemoval::Run (Pipe& inPipe, Pipe& outPipe, Schema& mySchema) {
+  PACK_ARGS4(param, &inPipe, &outPipe, &mySchema, runLength);
+  FATALIF(create_joinable_thread(&worker, work, param), "Error creating worker thread.");
 }
 
-void *Project::workerThread(void *arg) {
-    OpArgs *opArgs = (OpArgs *) arg;
-    Record temp;
+void* DuplicateRemoval::work(void* param) {
+  UNPACK_ARGS4(Args, param, in, out, myschema, runLen);
+  OrderMaker sortOrder(myschema);
+  Pipe sorted(PIPE_SIZE);
+  BigQ biq(*in, sorted, sortOrder, (int)runLen);
+  Record cur, next;
+  ComparisonEngine cmp;
 
-    while (opArgs->inPipe->Remove(&temp)) {
-        temp.Project(opArgs->keepMe, opArgs->numAttsOutput, opArgs->numAttsInput);
-        opArgs->outPipe->Insert(&temp);
-    }
-
-    opArgs->outPipe->ShutDown();
-    pthread_exit(NULL);
-}
-
-void Project::WaitUntilDone() {
-    pthread_join(thread, NULL);
-}
-
-void Project::Use_n_Pages(int runlen) {
-    n_pages = runlen;
-}
-
-void Join::Run(Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal) {
-    OpArgs *opArgs = new OpArgs(inPipeL, inPipeR, outPipe, selOp, literal,n_pages);
-    pthread_create(&thread, NULL, workerThread, opArgs);
-}
-
-void *Join::workerThread(void *arg) {
-    OpArgs *opArgs = (OpArgs *) arg;
-
-    Record *tmpL = new Record();
-    Record *tmpR = new Record();
-
-    vector<Record *> leftList, rightList;
-    OrderMaker orderMakerL, orderMakerR;
-
-    if (opArgs->selOp->GetSortOrders(orderMakerL, orderMakerR)) {
-
-        int leftAttrCount = 0, rightAttrCount = 0, totalAttrCount = 0;
-        int * keepMe = NULL;
-        Pipe* outPipeL= new Pipe(200);
-        Pipe* outPipeR=new Pipe(200);
-        BigQ bigQL = BigQ(*(opArgs->inPipeL), *outPipeL, orderMakerL, opArgs->n_pages);
-        BigQ bigQR = BigQ(*(opArgs->inPipeR), *outPipeR, orderMakerR, opArgs->n_pages);
-        bool leftEmpty = false, rightEmpty = false;
-
-        if (!outPipeL->Remove(tmpL)) {
-            opArgs->outPipe->ShutDown();
-            pthread_exit(NULL);
-        } else {
-            leftAttrCount = ((int *) tmpL->bits)[1] / sizeof(int) - 1;
-//            cout << "here .. "<<leftAttrCount<<endl;
-        }
-
-        if (!outPipeR->Remove(tmpR)) {
-            opArgs->outPipe->ShutDown();
-            pthread_exit(NULL);
-        } else {
-            rightAttrCount = ((int *) tmpR->bits)[1] / sizeof(int) - 1;
-//            cout << "here .. "<<rightAttrCount<<endl;
-        }
-
-        totalAttrCount = leftAttrCount + rightAttrCount;
-        keepMe = new int[totalAttrCount];
-        for (int i = 0; i < leftAttrCount; ++i) {
-            keepMe[i] = i;
-        }
-        for (int i = leftAttrCount; i < totalAttrCount; ++i) {
-            keepMe[i] = i - leftAttrCount;
-        }
-
-        leftList.emplace_back(tmpL);
-        tmpL = new Record();
-        rightList.emplace_back(tmpR);
-        tmpR = new Record();
-
-        if (!outPipeL->Remove(tmpL)) {
-            leftEmpty = true;
-        }
-        if (!outPipeR->Remove(tmpR)) {
-            rightEmpty = true;
-        }
-
-        bool leftBigger = false, rightBigger = false;
-
-        while (!leftEmpty && !rightEmpty) {
-
-            if (!leftBigger) {
-                while (!opArgs->compEng->Compare(leftList.back(), tmpL, &orderMakerL)) {
-                    leftList.emplace_back(tmpL);
-                    tmpL = new Record();
-                    if (!outPipeL->Remove(tmpL)) {
-                        leftEmpty = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!rightBigger) {
-                while (!opArgs->compEng->Compare(rightList.back(), tmpR, &orderMakerR)) {
-                    rightList.emplace_back(tmpR);
-                    tmpR = new Record();
-                    if (!outPipeR->Remove(tmpR)) {
-                        rightEmpty = true;
-                        break;
-                    }
-                }
-            }
-
-            if (opArgs->compEng->Compare(leftList.back(), &orderMakerL, rightList.back(), &orderMakerR) > 0) {
-                flushList(rightList);
-                leftBigger = true;
-                rightBigger = false;
-            } else if (opArgs->compEng->Compare(leftList.back(), &orderMakerL, rightList.back(), &orderMakerR) < 0) {
-                flushList(leftList);
-                leftBigger = false;
-                rightBigger = true;
-            } else {
-                for (auto tempL : leftList) {
-                    for (auto tempR : rightList) {
-                        if (opArgs->compEng->Compare(tempL, tempR, opArgs->literal, opArgs->selOp)) {
-                            Record mergedRec, cpRecR;
-                            cpRecR.Copy(tempR);
-                            mergedRec.MergeRecords(tempL, &cpRecR, leftAttrCount, rightAttrCount, keepMe, totalAttrCount,
-                                                   leftAttrCount);
-                            opArgs->outPipe->Insert(&mergedRec);
-                        }
-                    }
-                }
-
-                flushList(leftList);
-                flushList(rightList);
-                leftBigger = false;
-                rightBigger = false;
-            }
-
-            if (!leftEmpty && !leftBigger) {
-                leftList.emplace_back(tmpL);
-                tmpL = new Record();
-                if (!outPipeL->Remove(tmpL)) {
-                    leftEmpty = true;
-                }
-            }
-            if (!rightEmpty && !rightBigger) {
-                rightList.emplace_back(tmpR);
-                tmpR = new Record();
-                if (!outPipeR->Remove(tmpR)) {
-                    rightEmpty = true;
-                }
-            }
-        }
-
-        if (!leftList.empty() && !rightList.empty()) {
-            while (!leftEmpty) {
-                if (!leftBigger) {
-                    while (!opArgs->compEng->Compare(leftList.back(), tmpL, &orderMakerL)) {
-                        leftList.emplace_back(tmpL);
-                        tmpL = new Record();
-                        if (!outPipeL->Remove(tmpL)) {
-                            leftEmpty = true;
-                            break;
-                        }
-                    }
-                }
-                if (opArgs->compEng->Compare(leftList.back(), &orderMakerL, rightList.back(), &orderMakerR) > 0) {
-                    flushList(rightList);
-                    leftBigger = true;
-                    rightBigger = false;
-                    break;
-                } else if (opArgs->compEng->Compare(leftList.back(), &orderMakerL, rightList.back(), &orderMakerR) < 0) {
-                    flushList(leftList);
-                    leftBigger = false;
-                    rightBigger = true;
-                } else {
-                    for (auto tempL : leftList) {
-                        for (auto tempR : rightList) {
-                            if (opArgs->compEng->Compare(tempL, tempR, opArgs->literal, opArgs->selOp)) {
-                                Record mergedRec, cpRecR;
-                                cpRecR.Copy(tempR);
-                                mergedRec.MergeRecords(tempL, &cpRecR, leftAttrCount, rightAttrCount, keepMe,
-                                                       totalAttrCount, leftAttrCount);
-                                opArgs->outPipe->Insert(&mergedRec);
-                            }
-                        }
-                    }
-
-                    flushList(leftList);
-                    flushList(rightList);
-                    leftBigger = false;
-                    rightBigger = false;
-                    break;
-                }
-
-                if (!leftEmpty && !leftBigger) {
-                    leftList.emplace_back(tmpL);
-                    tmpL = new Record();
-                    if (!outPipeL->Remove(tmpL)) {
-                        leftEmpty = true;
-                    }
-                }
-            }
-            while (!rightEmpty) {
-                if (!rightBigger) {
-                    while (!opArgs->compEng->Compare(rightList.back(), tmpR, &orderMakerR)) {
-                        rightList.emplace_back(tmpR);
-                        tmpR = new Record();
-                        if (!outPipeR->Remove(tmpR)) {
-                            rightEmpty = true;
-                            break;
-                        }
-                    }
-                }
-                if (opArgs->compEng->Compare(leftList.back(), &orderMakerL, rightList.back(), &orderMakerR) > 0) {
-                    flushList(rightList);
-                    leftBigger = true;
-                    rightBigger = false;
-                } else if (opArgs->compEng->Compare(leftList.back(), &orderMakerL, rightList.back(), &orderMakerR) < 0) {
-                    flushList(leftList);
-                    leftBigger = false;
-                    rightBigger = true;
-                    break;
-                } else {
-                    for (auto tempL : leftList) {
-                        for (auto tempR : rightList) {
-                            if (opArgs->compEng->Compare(tempL, tempR, opArgs->literal, opArgs->selOp)) {
-                                Record mergedRec, cpRecR;
-                                cpRecR.Copy(tempR);
-                                mergedRec.MergeRecords(tempL, &cpRecR, leftAttrCount, rightAttrCount, keepMe,
-                                                       totalAttrCount, leftAttrCount);
-                                opArgs->outPipe->Insert(&mergedRec);
-                            }
-                        }
-                    }
-
-                    flushList(leftList);
-                    flushList(rightList);
-                    leftBigger = false;
-                    rightBigger = false;
-                    break;
-                }
-
-                if (!rightEmpty && !rightBigger) {
-                    rightList.emplace_back(tmpR);
-                    tmpR = new Record();
-                    if (!outPipeR->Remove(tmpR)) {
-                        rightEmpty = true;
-                    }
-                }
-            }
-        }
-    }
-    else {
-        int leftAttrCount = 0, rightAttrCount = 0, totalAttrCount = 0;
-        int *keepMe = NULL;
-
-        if (!opArgs->inPipeL->Remove(tmpL)) {
-            opArgs->outPipe->ShutDown();
-            pthread_exit(NULL);
-        } else {
-            leftAttrCount = *((int *) tmpL->bits);
-            leftList.emplace_back(tmpL);
-            tmpL = new Record();
-        }
-
-        if (!opArgs->inPipeR->Remove(tmpR)) {
-            opArgs->outPipe->ShutDown();
-            pthread_exit(NULL);
-        } else {
-            rightAttrCount = *((int *) tmpR->bits);
-            rightList.emplace_back(tmpR);
-            tmpR = new Record();
-        }
-
-        totalAttrCount = leftAttrCount + rightAttrCount;
-        keepMe = new int[totalAttrCount];
-
-        for (int i = 0; i < leftAttrCount; ++i) {
-            keepMe[i] = i;
-        }
-        for (int i = leftAttrCount; i < totalAttrCount; ++i) {
-            keepMe[i] = i - leftAttrCount;
-        }
-
-        while (opArgs->inPipeL->Remove(tmpL)) {
-            leftList.emplace_back(tmpL);
-            tmpL = new Record();
-        }
-        while (opArgs->inPipeR->Remove(tmpR)) {
-            rightList.emplace_back(tmpR);
-            tmpR = new Record();
-        }
-        for (auto tempL : leftList) {
-            for (auto tempR : rightList) {
-                if (opArgs->compEng->Compare(tempL, tempR, opArgs->literal, opArgs->selOp)) {
-                    Record mergedRec;
-                    mergedRec.MergeRecords(tmpL, tmpR, leftAttrCount, rightAttrCount, keepMe, totalAttrCount,
-                                           leftAttrCount);
-                    opArgs->outPipe->Insert(&mergedRec);
-                }
-            }
-        }
-    }
-
-    flushList(leftList);
-    flushList(rightList);
-    delete tmpL;
-    tmpL = NULL;
-    delete tmpR;
-    tmpR = NULL;
-
-
-    opArgs->outPipe->ShutDown();
-    pthread_exit(NULL);
-}
-
-void Join::WaitUntilDone() {
-    pthread_join(thread, NULL);
-}
-
-void Join::Use_n_Pages(int runlen) {
-    n_pages = runlen;
-}
-
-void DuplicateRemoval::Run(Pipe &inPipe, Pipe &outPipe, Schema &mySchema) {
-    OpArgs *opArgs = new OpArgs(inPipe, outPipe, mySchema,n_pages);
-    pthread_create(&thread, NULL, workerThread, opArgs);
-}
-
-void *DuplicateRemoval::workerThread(void *arg){
-    OpArgs *opArgs = (OpArgs *) arg;
-    Record temp1;
-    Record temp2;
-    OrderMaker orderMaker = OrderMaker(opArgs->mySchema);
-
-
-    Pipe *tempPipe = new Pipe(100);
-    BigQ bigQ = BigQ(*(opArgs->inPipe), *tempPipe, orderMaker, opArgs->n_pages);
-
-
-    if (tempPipe->Remove(&temp1)) {
-        while (tempPipe->Remove(&temp2)) {
-            if (opArgs->compEng->Compare(&temp1, &temp2, &orderMaker)) {
-                opArgs->outPipe->Insert(&temp1);
-                temp1.Consume(&temp2);
-            }
-        }
-        opArgs->outPipe->Insert(&temp1);
-    }
-
-    tempPipe->ShutDown();
-    delete tempPipe;
-
-    opArgs->outPipe->ShutDown();
-    pthread_exit(NULL);
-}
-
-void DuplicateRemoval::WaitUntilDone() {
-    pthread_join(thread, NULL);
-}
-
-void DuplicateRemoval::Use_n_Pages(int runlen) {
-    n_pages = runlen;
-}
-
-void Sum::Run(Pipe &inPipe, Pipe &outPipe, Function &computeMe) {
-    OpArgs *opArgs = new OpArgs(inPipe, outPipe, computeMe);
-    pthread_create(&thread, NULL, workerThread, opArgs);
-}
-
-//void *Sum::workerThread(void *arg) {
-//    OpArgs *opArgs = (OpArgs *) arg;
-//
-//    int totaltotalSumInt = 0;
-//    double totaltotalSumDoub = 0.0;
-//
-//    int tempatIntue = 0;
-//    double tempatDoubleue = 0.0;
-//
-//    Record tempord;
-////    Function *function = function;
-//    Type type;
-//
-//    ostringstream outResult;
-//    string sumResult;
-//    Record tempordResult;
-//
-//    //type check only for first tempord
-//    if(opArgs->inPipe->Remove(&tempord))
-//        type = opArgs->function->Apply(tempord, tempatIntue, tempatDoubleue);
-//
-//    if (type == Int) {
-//        totaltotalSumInt += tempatIntue;
-//        while (opArgs->inPipe->Remove(&tempord)) {
-//            totaltotalSumInt += tempatIntue;
-//        }
-//    }else{
-//        totaltotalSumDoub += tempatDoubleue;
-//        while (opArgs->inPipe->Remove(&tempord)) {
-//            totaltotalSumDoub += tempatDoubleue;
-//        }
-//    }
-////    while (inPipe->Remove(&tempord)) {
-////        type = function->Apply(tempord, tempatIntue, tempatDoubleue);
-////        if (type == Int) {
-////            totalSumInt += intAttrVal;
-////        } else {
-////            totalSumDoub += doubleAttrVal;
-////        }
-////    }
-//
-//    // create output tempord
-//    if (type == Int) {
-//        outResult << totaltotalSumInt;
-//        sumResult = outResult.str();
-//        sumResult.append("|");
-//
-//        Attribute IA = {"int", Int};
-//        Schema output_schema("output_schema", 1, &IA);
-//        tempordResult.ComposeRecord(&output_schema, sumResult.c_str());
-//    } else {
-//
-//        outResult << totaltotalSumDoub;
-//        sumResult = outResult.str();
-//        sumResult.append("|");
-//
-//        Attribute DA = {"double", Double};
-////        parameters.myType = Double;
-//        Schema output_schema("output_schema", 1, &DA);
-//        tempordResult.ComposeRecord(&output_schema, sumResult.c_str());
-//    }
-////    cout<<tempordResult.GetLength();
-//    opArgs->outPipe->Insert(&tempordResult);
-//    opArgs->outPipe->ShutDown();
-//    pthread_exit(NULL);
-//}
-void *Sum::workerThread(void *arg)  {
-    OpArgs *s = (OpArgs*)arg;
-    Record temp1, temp;
-
-    int totalSumInt = 0;
-    int atInt = 0;
-
-    Attribute parameters;
-    parameters.name = "SUM";
-    stringstream output;
-
-    double totalSumDoub = 0.0;
-    double atDouble = 0.0;
-
-    if (s->function->returnsInt == 1) {
-        Type dataType = Int;
-        while (s->inPipe->Remove(&temp)) {
-            dataType = s->function->Apply(temp, atInt, atDouble);
-            totalSumInt = totalSumInt + atInt;
-        }
-        output << totalSumInt << "|";
-    }
-    else if (s->function->returnsInt == 0) {
-        Type dataType = Double;
-        while (s->inPipe->Remove(&temp)) {
-            dataType = s->function->Apply(temp, atInt, atDouble);
-            totalSumDoub = totalSumDoub + atDouble;
-        }
-        parameters.myType = Double;
-        output << totalSumDoub << "|";
-    }
-    else {
-        exit(1);
-    }
-
-    Schema scheme_out("out_shema", 1, &parameters);
-    temp1.ComposeRecord(&scheme_out, output.str().c_str());
-    s->outPipe->Insert(&temp1);
-
-    s->outPipe->ShutDown();
-    pthread_exit(NULL);
-}
-
-void Sum::WaitUntilDone() {
-    pthread_join(thread, NULL);
-}
-
-void Sum::Use_n_Pages(int runlen) {
-    n_pages = runlen;
-//todo
+  if(sorted.Remove(&cur)) {  // cur holds the current group
+    while(sorted.Remove(&next))
+      if(cmp.Compare(&cur, &next, &sortOrder)) {
+        out->Insert(&cur);
+        cur.Consume(&next);
+      }
+    out->Insert(&cur);   // inserts the last group
+  }
+  out->ShutDown();
 }
 
 void GroupBy::Run(Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe) {
-    OpArgs *opArgs = new OpArgs(inPipe, outPipe, groupAtts, computeMe,n_pages);
-    pthread_create(&thread, NULL, workerThread, opArgs);
+  PACK_ARGS5(param, &inPipe, &outPipe, &groupAtts, &computeMe, runLength);
+  FATALIF(create_joinable_thread(&worker, work, param), "Error creating worker thread.");
 }
 
-void *GroupBy::workerThread(void *arg) {
-    OpArgs* opArgs = (OpArgs*)arg;
-
-    Record *temp = new Record;
-    Record *spare = new Record;
-    
-    Record arrayTemp[2];
-    Record *start = NULL, *end = NULL;
-
-    Type type;
-    Pipe *pipe = new Pipe(100);
-    BigQ bigq(*opArgs->inPipe, *pipe, *opArgs->orderMaker, 10);
-
-    int along = (opArgs->orderMaker->numAtts)+1;
-
-    int whichG = 0, totalSumInt = 0, tIntRec, paramA[along];
-    double totalSumDoub=0, tDoubRec;
-
-    paramA[0] = 0;
-
-    for(int i = 1; i < along; i++)
-        paramA[i] = opArgs->orderMaker->whichAtts[i-1];
-
-    while(pipe->Remove(&arrayTemp[whichG%2]) == 1)
-    {
-        start = end;
-        end = &arrayTemp[whichG%2];
-        if(start != NULL && end != NULL)
-        {
-            if(opArgs->compEng->Compare(start, end, opArgs->orderMaker) != 0)
-            {
-                opArgs->function->Apply(*start, tIntRec, tDoubRec);
-                if(opArgs->function->returnsInt == 1)
-                {
-                    type = Int;
-                    totalSumInt = totalSumInt + tIntRec;
-                }
-                else
-                {
-                    type = Double;
-                    totalSumDoub = totalSumDoub + tDoubRec;
-                }
-                int startint = ((int *)start->bits)[1]/sizeof(int) - 1;
-
-                Attribute parameters;
-                stringstream output;
-                if(type==Int){
-                    parameters.name="int";
-                    parameters.myType=Int;
-                    output << totalSumInt << "|";
-                }
-                else{
-                    parameters.name="double";
-                    parameters.myType=Double;
-                    output << totalSumDoub << "|";
-                }
-                Schema out_sch ("sum", 1, &parameters);
-                spare->ComposeRecord(&out_sch,output.str().c_str());
-                temp->MergeRecords(spare, start, 1, startint, paramA, along, 1);
-                opArgs->outPipe->Insert(temp);
-                totalSumInt = 0;
-                totalSumDoub = 0;
-            }
-            else
-            {
-                opArgs->function->Apply(*start, tIntRec, tDoubRec);
-                if(opArgs->function->returnsInt == 1)
-                {
-                    type = Int;
-                    totalSumInt = totalSumInt + tIntRec;
-                }
-                else
-                {
-                    type = Double;
-                    totalSumDoub = totalSumDoub + tDoubRec;
-                }
-            }
-        }
-        whichG++;
-    }
-
-    opArgs->function->Apply(*end, tIntRec, tDoubRec);
-    if(opArgs->function->returnsInt == 1)
-    {
-        type = Int;
-        totalSumInt = totalSumInt + tIntRec;
-    }
-    else
-    {
-        type = Double;
-        totalSumDoub = totalSumDoub + tDoubRec;
-    }
-    int startint = ((int *)start->bits)[1]/sizeof(int) - 1;
-
-    Attribute parameters;
-    stringstream output;
-    if(type==Int){
-        parameters.name="int";
-        parameters.myType=Int;
-        output << totalSumInt << "|";
-    }
-    else{
-        parameters.name="double";
-        parameters.myType=Double;
-        output << totalSumDoub << "|";
-    }
-    Schema out_sch ("sum", 1, &parameters);
-    spare->ComposeRecord(&out_sch,output.str().c_str());
-    temp->MergeRecords(spare, end, 1, startint, paramA, along, 1);
-    opArgs->outPipe->Insert(temp);
-
-    opArgs->outPipe->ShutDown();
-    pthread_exit(NULL);
+void* GroupBy::work(void* param) {
+  UNPACK_ARGS5(Args, param, in, out, order, func, runLen);
+  if (func->resultType() == Int) doGroup<int>(in, out, order, func, runLen);
+  else doGroup<double>(in, out, order, func, runLen);
+  out->ShutDown();
 }
 
-void GroupBy::WaitUntilDone() {
-    pthread_join(thread, NULL);
+void WriteOut::Run (Pipe &inPipe, FILE *outFile, Schema &mySchema) {
+  PACK_ARGS3(param, &inPipe, outFile, &mySchema);
+  FATALIF(create_joinable_thread(&worker, work, param), "Error creating worker thread.");
 }
 
-void GroupBy::Use_n_Pages(int runlen) {
-    n_pages = runlen;
+void* WriteOut::work(void* param) {
+  UNPACK_ARGS3(Args, param, in, out, myschema);
+  FOREACH_INPIPE(rec, in) rec.Write(out, myschema);
 }
 
-void WriteOut::Run(Pipe &inPipe, FILE *outFile, Schema &mySchema) {
-    OpArgs *opArgs = new OpArgs(inPipe, outFile, mySchema);
-    pthread_create(&thread, NULL, workerThread, opArgs);
+void RelationalOp::WaitUntilDone() {
+  FATALIF(pthread_join (worker, NULL), "joining threads failed."); 
 }
 
-void *WriteOut::workerThread(void *arg) {
-    OpArgs *opsArgs = (OpArgs *)arg;
-    Record temp;
-
-    while (opsArgs->inPipe->Remove(&temp)) {
-//        opsArgs->writeOut(temp);
-        int numAtts = opsArgs->schema->GetNumAtts();
-        Attribute *parameters = opsArgs->schema->GetAtts();
-        for (int i = 0; i < numAtts; i++) {
-
-            int towards = ((int *)temp.bits)[i + 1];
-
-            if (parameters[i].myType == Int) {
-                int *defInt = (int *) &(temp.bits[towards]);
-                fprintf(opsArgs->outPipe, "%d", *defInt);
-
-            }
-            else if (parameters[i].myType == Double) {
-                double *defdoub = (double *) &(temp.bits[towards]);
-                fprintf(opsArgs->outPipe, "%f", *defdoub);
-
-            }
-            else if (parameters[i].myType == String) {
-                char *defStr = (char *) &(temp.bits[towards]);
-                fprintf(opsArgs->outPipe, "%s", defStr);
-            }
-            fprintf(opsArgs->outPipe, "|");
-        }
-
-        fprintf(opsArgs->outPipe, "\n");
-    }
-    fclose(opsArgs->outPipe);
-    opsArgs->inPipe->ShutDown();
-    pthread_exit(NULL);
+int RelationalOp::create_joinable_thread(pthread_t *thread,
+                                         void *(*start_routine) (void *), void *arg) {
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+  int rc = pthread_create(thread, &attr, start_routine, arg);
+  pthread_attr_destroy(&attr);
+  return rc;
 }
 
-
-void WriteOut::WaitUntilDone() {
-    pthread_join(thread, NULL);
+JoinBuffer::JoinBuffer(size_t npages): size(0), capacity(PAGE_SIZE*npages), nrecords(0) {
+  buffer = (Record*)malloc(PAGE_SIZE*npages);
 }
 
-void WriteOut::Use_n_Pages(int n) {
-    n_pages = n;
+JoinBuffer::~JoinBuffer() { free(buffer); }
+
+bool JoinBuffer::add (Record& addme) {
+  if((size+=addme.getLength())>capacity) return 0;
+  buffer[nrecords++].Consume(&addme);
+  return 1;
 }

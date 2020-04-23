@@ -1,5 +1,6 @@
-#ifndef FUNCTION_H
-#define FUNCTION_H
+#ifndef FUNCTION_H_
+#define FUNCTION_H_
+
 #include "Record.h"
 #include "ParseTree.h"
 
@@ -24,12 +25,11 @@ private:
 	Arithmatic *opList;
 	int numOps;
 
-
+	int returnsInt;
 
 public:
 
 	Function ();
-    int returnsInt;
 
 	// this grows the specified function from a parse tree and converts
 	// it into an accumulator-based computation over the attributes in
@@ -45,5 +45,15 @@ public:
 
 	// applies the function to the given record and returns the result
 	Type Apply (Record &toMe, int &intResult, double &doubleResult);
+
+        template <class T>
+        T Apply (Record& toMe) {
+          int intResult; double doubleResult;
+          Apply (toMe, intResult, doubleResult);
+          return returnsInt ? intResult : doubleResult;
+        }
+
+        Type resultType() const { return returnsInt ? Int : Double; }
 };
+
 #endif

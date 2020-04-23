@@ -8,18 +8,13 @@
 #include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
-#include <vector>
-#include <string>
-
-using namespace std;
 
 struct att_pair {
-	char *name;
+        char* name;
 	Type type;
 };
 struct Attribute {
-
-	char *name;
+	char* name;
 	Type myType;
 };
 
@@ -36,10 +31,8 @@ class Schema {
 	friend class Record;
 
 public:
-    Schema ();
 
-
-    // gets the set of attributes, but be careful with this, since it leads
+	// gets the set of attributes, but be careful with this, since it leads
 	// to aliasing!!!
 	Attribute *GetAtts ();
 
@@ -54,20 +47,20 @@ public:
 	Type FindType (char *attName);
 
 	// this reads the specification for the schema in from a file
-	Schema (char *fName, char *relName);
+        Schema (char *fName, char *relName, const char* alias = "");
 
 	// this composes a schema instance in-memory
 	Schema (char *fName, int num_atts, Attribute *atts);
+
+        // this combines two schemas, used as the result schema of a join
+        Schema (const Schema& left, const Schema& right);
 
 	// this constructs a sort order structure that can be used to
 	// place a lexicographic ordering on the records using this type of schema
 	int GetSortOrder (OrderMaker &order);
 
+  void print(std::ostream& os = std::cout) const;
 	~Schema ();
-
-    Schema* Project(NameList* attsLeft, int* &keepMe);
-
-    void Print();
 
 };
 

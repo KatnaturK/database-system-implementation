@@ -1,5 +1,4 @@
-
-CC = g++ -std=c++11 -O2 -Wno-deprecated
+LDLIBS = -lfl -lpthread
 
 tag = -i
 
@@ -7,106 +6,60 @@ ifdef linux
 tag = -n
 endif
 
+.PHONY: all
+all: CXXFLAGS += -O2
+all: a42.out
 
-a42.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o Operator.o a42.o
-	$(CC) -o a42.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o Operator.o a42.o -lfl -lpthread
+.PHONY: debug
+debug: CXXFLAGS += -g -Wno-deprecated
+debug: CPPFLAGS += -DDEBUG
+debug: clean test.out
 
-main.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o main.o
-	$(CC) -o main.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o main.o -lfl -lpthread
+run: test.out
+	$(RM) *.tmp
+	$(CURDIR)/test.out 6
 
-gtest.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o gtest.o
-	$(CC) -o gtest.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o gtest.o -lfl -lpthread -lgtest
+a42.out: QueryPlan.o Statistics.o Record.o Comparison.o ComparisonEngine.o Schema.o File.o Pipe.o BigQ.o RelOp.o Function.o DBFile.o HeapFile.o SortedFile.o  yyfunc.tab.o lex.yyfunc.o y.tab.o lex.yy.o test.o
+	$(CXX) -o $@ $^ $(LDLIBS)
 
-#test.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o test.o
-#	$(CC) -o test.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o test.o -lfl -lpthread
+test2.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o test2.o
+	$(CXX) -o $@ $^ $(LDLIBS)
 
-#test1.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o test1.o
-#	$(CC) -o test1.out Record.o Comparison.o ComparisonEngine.o Schema.o File.o DBFile.o Pipe.o BigQ.o RelOp.o Function.o y.tab.o yyfunc.tab.o lex.yy.o lex.yyfunc.o Meta.o Statistics.o test1.o -lfl -lpthread
-#
+test.o: ParseTree.h QueryPlan.h
+test2.o: test2.h Pipe.h DBFile.h Record.h
+QueryPlan.o: QueryPlan.h Schema.h ParseTree.h Statistics.h Comparison.h
+Statistics.o: Statistics.h ParseTree.h
+DBFile.o: DBFile.h Record.h Schema.h File.h Comparison.h ComparisonEngine.h Errors.h HeapFile.h SortedFile.h
+HeapFile.o: HeapFile.h DBFile.h Record.h Schema.h File.h Comparison.h ComparisonEngine.h Defs.h Errors.h
+SortedFile.o: SortedFile.h DBFile.h BigQ.h
+Comparison.o: Comparison.h ComparisonEngine.h File.h Schema.h Record.h Defs.h
+ComparisonEngine.o: ComparisonEngine.h Comparison.h Record.h Schema.h File.h
+Pipe.o: Pipe.h Record.h
+BigQ.o: BigQ.h Pipe.h File.h Record.h
+RelOp.o: RelOp.h Pipe.h DBFile.h Record.h Function.h Pthreadutil.h Errors.h
+Function.o: Function.h Record.h ParseTree.h
+File.o: File.h TwoWayList.h Record.h Schema.h Comparison.h ComparisonEngine.h
+Record.o: Record.h Defs.h ParseTree.h Schema.h File.h Comparison.h ComparisonEngine.h
+Schema.o: Schema.h Record.h File.h Comparison.h ComparisonEngine.h
 
-a42.o: a42.cc
-	$(CC) -g -c a42.cc
-
-Operator.o: Operator.cc
-	$(CC) -g -c Operator.cc
-
-Statistics.o: Statistics.cc
-	$(CC) -g -c Statistics.cc
-
-Meta.o: Meta.cc
-	$(CC) -g -c Meta.cc
-
-#main.o: main.cc
-#	$(CC) -g -c main.cc
-
-test.o: test.cc
-	$(CC) -g -c test.cc
-
-test1.o: test1.cc
-	$(CC) -g -c test1.cc
-
-a2-2test.o: a2-2test.cc
-	$(CC) -g -c a2-2test.cc
-
-a2test.o: a2test.cc
-	$(CC) -g -c a2test.cc
-
-a1-test.o: a1-test.cc
-	$(CC) -g -c a1-test.cc
-
-Comparison.o: Comparison.cc
-	$(CC) -g -c Comparison.cc
-	
-ComparisonEngine.o: ComparisonEngine.cc
-	$(CC) -g -c ComparisonEngine.cc
-	
-DBFile.o: DBFile.cc
-	$(CC) -g -c DBFile.cc
-
-Pipe.o: Pipe.cc
-	$(CC) -g -c Pipe.cc
-
-BigQ.o: BigQ.cc
-	$(CC) -g -c BigQ.cc
-
-RelOp.o: RelOp.cc
-	$(CC) -g -c RelOp.cc
-
-Function.o: Function.cc
-	$(CC) -g -c Function.cc
-
-File.o: File.cc
-	$(CC) -g -c File.cc
-
-Record.o: Record.cc
-	$(CC) -g -c Record.cc
-
-Schema.o: Schema.cc
-	$(CC) -g -c Schema.cc
-	
 y.tab.o: Parser.y
 	yacc -d Parser.y
-	#sed $(tag) y.tab.c -e "s/  __attribute__ ((__unused__))$$/# ifndef __cplusplus\n  __attribute__ ((__unused__));\n# endif/" 
+	sed $(tag) y.tab.c -e "s/  __attribute__ ((__unused__))$$/# ifndef __cplusplus\n  __attribute__ ((__unused__));\n# endif/" 
 	g++ -c y.tab.c
-		
+
 yyfunc.tab.o: ParserFunc.y
 	yacc -p "yyfunc" -b "yyfunc" -d ParserFunc.y
-	#sed $(tag) yyfunc.tab.c -e "s/  __attribute__ ((__unused__))$$/# ifndef __cplusplus\n  __attribute__ ((__unused__));\n# endif/" 
+ #sed $(tag) yyfunc.tab.c -e "s/  __attribute__ ((__unused__))$$/# ifndef __cplusplus\n  __attribute__ ((__unused__));\n# endif/" 
 	g++ -c yyfunc.tab.c
-	
+
 lex.yy.o: Lexer.l
-	lex Lexer.l
+	lex  Lexer.l
 	gcc  -c lex.yy.c
 
 lex.yyfunc.o: LexerFunc.l
 	lex -Pyyfunc LexerFunc.l
 	gcc  -c lex.yyfunc.c
 
-
+.PHONY: clean
 clean: 
-	rm -f *.o
-	rm -f *.out
-	rm -f y.tab.*
-	rm -f yyfunc.tab.*
-	rm -f lex.yy.*
-	rm -f lex.yyfunc*
+	$(RM) *.o *.out y.tab.* yyfunc.tab.* lex.yy.* lex.yyfunc*

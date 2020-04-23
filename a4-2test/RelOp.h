@@ -1,281 +1,177 @@
-#ifndef REL_OP_H
-#define REL_OP_H
+#ifndef REL_OP_H_
+#define REL_OP_H_
 
+#include <pthread.h>
+
+#include "BigQ.h"
 #include "Pipe.h"
 #include "DBFile.h"
-#include "Record.h"
 #include "Function.h"
-#include <sstream>
-#include <stdlib.h>
-#include <vector>
+#include "Pthreadutil.h"   // pack, unpact, etc
+#include "Defs.h"
 
 class RelationalOp {
 public:
-    int n_pages=10;
-    // blocks the caller until the particular relational operator
-    // has run to completion
-    virtual void WaitUntilDone() = 0;
+  // blocks the caller until the particular relational operator 
+  // has run to completion
+  virtual void WaitUntilDone ();
 
-    // tell us how much internal memory the operation can use
-    virtual void Use_n_Pages(int n) = 0;
+  // tell us how much internal memory the operation can use
+  virtual void Use_n_Pages (int n) = 0;
+
+protected:
+  pthread_t worker;
+  static int create_joinable_thread(pthread_t *thread,
+                                    void *(*start_routine) (void *), void *arg);
 };
 
-
-class SelectFile : public RelationalOp {
-private:
-    pthread_t thread;
-
+class SelectFile: public RelationalOp {
 public:
-    void Run(DBFile &inFile, Pipe &outPipe, CNF &selOp, Record &literal);
+  void Run (DBFile& inFile, Pipe& outPipe, CNF& selOp, Record& literal);
+  void Use_n_Pages (int n) {}
 
-    void WaitUntilDone();
-
-    void Use_n_Pages(int n);
-
-    static void *workerThread(void *arg);
-
-    class OpArgs {
-    public:
-        DBFile *inFile;
-        Pipe *outPipe;
-        CNF *selOp;
-        Record *literal;
-        ComparisonEngine *compEng;
-
-        OpArgs(DBFile &inFile1, Pipe &outPipe1, CNF &selOp1, Record &literal1) {
-            literal = &literal1;
-            inFile = &inFile1;
-            outPipe = &outPipe1;
-            selOp = &selOp1;
-        }
-    };
-
-};
-
-class SelectPipe : public RelationalOp {
 private:
-    pthread_t thread;
-
-public:
-    void Run(Pipe &inPipe, Pipe &outPipe, CNF &selOp, Record &literal);
-
-    void WaitUntilDone();
-
-    void Use_n_Pages(int n);
-
-    static void *workerThread(void *arg);
-
-    class OpArgs {
-    public:
-        Pipe *inPipe;
-        Pipe *outPipe;
-        CNF *selOp;
-        Record *literal;
-        ComparisonEngine *compEng;
-
-        OpArgs(Pipe &inPipe1, Pipe &outPipe1, CNF &selOp1, Record &literal1) {
-            literal = &literal1;
-            inPipe = &inPipe1;
-            outPipe = &outPipe1;
-            selOp = &selOp1;
-        }
-    };
+  MAKE_STRUCT4(Args, DBFile*, Pipe*, CNF*, Record*);
+  static void* work(void* param);
 };
 
-class Project : public RelationalOp {
+class SelectPipe: public RelationalOp {
+public:
+  void Run (Pipe& inPipe, Pipe& outPipe, CNF& selOp, Record& literal);
+  void Use_n_Pages (int n) {}
+
 private:
-    pthread_t thread;
-
-public:
-    void Run(Pipe &inPipe, Pipe &outPipe, int *keepMe, int numAttsInput, int numAttsOutput);
-
-    void WaitUntilDone();
-
-    void Use_n_Pages(int n);
-
-    static void *workerThread(void *arg);
-
-    class OpArgs {
-    public:
-        Pipe *inPipe;
-        Pipe *outPipe;
-        int *keepMe;
-        int numAttsInput;
-        int numAttsOutput;
-
-        OpArgs(Pipe &inPipe1, Pipe &outPipe1, int *keepMe1, int numAttsInput1, int numAttsOutput1) {
-            inPipe = &inPipe1;
-            outPipe = &outPipe1;
-            keepMe = keepMe1;
-            numAttsInput = numAttsInput1;
-            numAttsOutput = numAttsOutput1;
-        }
-    };
+  MAKE_STRUCT4(Args, Pipe*, Pipe*, CNF*, Record*);
+  static void* work(void* param);
 };
 
-class Join : public RelationalOp {
+// please be aware that the nested loops join assumes that LHS is the smaller relation
+class Project: public RelationalOp { 
+public:
+  void Run (Pipe& inPipe, Pipe& outPipe, int* keepMe, int numAttsInput, int numAttsOutput);
+  void Use_n_Pages (int n) {}
+
 private:
-    pthread_t thread;
-
-public:
-    void Run(Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal);
-
-    void WaitUntilDone();
-
-    void Use_n_Pages(int n);
-
-    static void *workerThread(void *arg);
-
-    static void flushList(vector<Record *> &v) {
-        for (auto r : v) {
-            delete r;
-            r = nullptr;
-        }
-        v.clear();
-    }
-
-    class OpArgs {
-    public:
-        Pipe *inPipeL;
-        Pipe *inPipeR;
-        Pipe *outPipe;
-        CNF *selOp;
-        Record *literal;
-        ComparisonEngine *compEng;
-        int n_pages;
-
-        OpArgs(Pipe &inPipeL1, Pipe &inPipeR1, Pipe &outPipe1, CNF &selOp1, Record &literal1,int n_pages1) {
-            inPipeL = &inPipeL1;
-            inPipeR = &inPipeR1;
-            outPipe = &outPipe1;
-            selOp = &selOp1;
-            literal = &literal1;
-            n_pages=n_pages1;
-        }
-        void vectorCleanup(vector<Record *> &v);
-    };
+  MAKE_STRUCT5(Args, Pipe*, Pipe*, int*, int, int);
+  static void* work(void* param);
 };
 
-class DuplicateRemoval : public RelationalOp {
+class Sum: public RelationalOp {
+public:
+  void Run (Pipe& inPipe, Pipe& outPipe, Function& computeMe);
+  void Use_n_Pages (int n) {}
+
 private:
-    pthread_t thread;
-
-public:
-    int n_pages;
-
-    void Run(Pipe &inPipe, Pipe &outPipe, Schema &mySchema);
-
-    void WaitUntilDone();
-
-    void Use_n_Pages(int n);
-
-    static void *workerThread(void *arg);
-
-    class OpArgs {
-    public:
-        Pipe *inPipe;
-        Pipe *outPipe;
-        Schema *mySchema;
-        int n_pages;
-        ComparisonEngine *compEng;
-
-        OpArgs(Pipe &inPipe1, Pipe &outPipe1, Schema &mySchema1,int n_pages1) {
-            inPipe = &inPipe1;
-            outPipe = &outPipe1;
-            mySchema = &mySchema1;
-            n_pages=n_pages1;
-        }
-    };
+  MAKE_STRUCT3(Args, Pipe*, Pipe*, Function*);
+  static void* work(void* param);
+  template <class T> static void doSum(Pipe* in, Pipe* out, Function* func);
 };
 
-class Sum : public RelationalOp {
+class SortBasedOp: public RelationalOp {
+public:
+  SortBasedOp(size_t runLen = 128): runLength(runLen) {}
+  void Use_n_Pages (int n) { runLength = n; }  // the remaining page serves as input buffer
+
+protected:
+  size_t runLength;
+};
+
+class JoinBuffer;
+class Join: public SortBasedOp { 
+public:
+  void Run (Pipe &inPipeL, Pipe &inPipeR, Pipe &outPipe, CNF &selOp, Record &literal);
+
 private:
-    pthread_t thread;
-
-public:
-    void Run(Pipe &inPipe, Pipe &outPipe, Function &computeMe);
-
-    void WaitUntilDone();
-
-    void Use_n_Pages(int n);
-
-    static void *workerThread(void *arg);
-
-    class OpArgs {
-    public:
-        Pipe *inPipe;
-        Pipe *outPipe;
-        Function *function;
-        int n_pages;
-
-        OpArgs(Pipe &inFile1, Pipe &outPipe1, Function &function1) {
-            inPipe = &inFile1;
-            outPipe = &outPipe1;
-            function = &function1;
-        }
-    };
+  MAKE_STRUCT6(Args, Pipe*, Pipe*, Pipe*, CNF*, Record*, size_t);
+  static void* work(void* param);
+  static void sortMergeJoin(Pipe* pleft, OrderMaker* orderLeft, Pipe* pright, OrderMaker* orderRight, Pipe* pout,
+                             CNF* sel, Record* literal, size_t runLen);
+  static void nestedLoopJoin(Pipe* pleft, Pipe* pright, Pipe* pout, CNF* sel, Record* literal, size_t runLen);
+  static void joinBuf(JoinBuffer& buffer, DBFile& file, Pipe& out, Record& literal, CNF& sleOp);
+  static void dumpFile(Pipe& in, DBFile& out);
 };
 
-class GroupBy : public RelationalOp {
+class JoinBuffer {
+  friend class Join;
+  JoinBuffer(size_t npages);
+  ~JoinBuffer();
+ 
+  bool add (Record& addme);
+  void clear () { size=nrecords=0; }
+
+  size_t size, capacity;   // in bytes
+  size_t nrecords;
+  Record* buffer;
+};
+
+class DuplicateRemoval: public SortBasedOp {
+public:
+  void Run (Pipe& inPipe, Pipe& outPipe, Schema& mySchema);
+
 private:
-    pthread_t thread;
-public:
-    void Run(Pipe &inPipe, Pipe &outPipe, OrderMaker &groupAtts, Function &computeMe);
-
-    void WaitUntilDone();
-
-    void Use_n_Pages(int n);
-
-    static void *workerThread(void *arg);
-
-    class OpArgs {
-    public:
-        Pipe *inPipe;
-        Pipe *outPipe;
-        Function *function;
-        OrderMaker *orderMaker;
-        int n_pages;
-        ComparisonEngine *compEng;
-
-        OpArgs(Pipe &inFile1, Pipe &outPipe1, OrderMaker &groupAtts, Function &function1,int n_pages1) {
-            inPipe = &inFile1;
-            outPipe = &outPipe1;
-            orderMaker = &groupAtts;
-            function = &function1;
-            n_pages=n_pages1;
-        }
-    };
+  MAKE_STRUCT4(Args, Pipe*, Pipe*, Schema*, size_t);
+  static void* work(void* param);
 };
 
-class WriteOut : public RelationalOp {
+class GroupBy: public SortBasedOp {
+public:
+  void Run (Pipe& inPipe, Pipe& outPipe, OrderMaker& groupAtts, Function& computeMe);
+
 private:
-    pthread_t thread;
-
-public:
-    void Run(Pipe &inPipe, FILE *outFile, Schema &mySchema);
-
-    void WaitUntilDone();
-
-    void Use_n_Pages(int n);
-
-    static void *workerThread(void *arg);
-
-//    void writeOut(Record &rec);
-
-    class OpArgs {
-    public:
-        Pipe *inPipe;
-        FILE *outPipe;;
-        Schema *schema;
-        int n_pages;
-
-        OpArgs(Pipe &inPipe1, FILE *outPipe1, Schema &mySchema) {
-            inPipe = &inPipe1;
-            outPipe = outPipe1;
-            schema = &mySchema;
-        }
-    };
-
+  MAKE_STRUCT5(Args, Pipe*, Pipe*, OrderMaker*, Function*, size_t);
+  static void* work(void* param);
+  template <class T>
+  static void doGroup(Pipe* in, Pipe* out, OrderMaker* order, Function* func, size_t runLen);
+  template <class T>
+  static void putGroup(Record& cur, const T& sum, Pipe* out, OrderMaker* order) {
+    cur.Project(order->getAtts(), order->getNumAtts(), cur.numAtts());
+    cur.prepend(sum);
+    out->Insert(&cur);
+  }
 };
+
+class WriteOut: public RelationalOp {
+public:
+  void Run (Pipe &inPipe, FILE *outFile, Schema &mySchema);
+  void Use_n_Pages (int n) {}
+
+private:
+  MAKE_STRUCT3(Args, Pipe*, FILE*, Schema*);
+  static void* work(void* param);
+};
+
+
+
+/********************************************************************************
+ * template definitions.                                                        *
+ ********************************************************************************/
+template <class T>
+void Sum::doSum(Pipe* in, Pipe* out, Function* func) {
+  T sum=0; Record rec;
+  while (in->Remove(&rec))
+    sum += func->Apply<T>(rec);
+  Record result(sum);
+  out->Insert(&result);
+}
+
+template <class T>   // similar to duplicate elimination
+void GroupBy::doGroup(Pipe* in, Pipe* out, OrderMaker* order, Function* func, size_t runLen) {
+  Pipe sorted(PIPE_SIZE);
+  BigQ biq(*in, sorted, *order, (int)runLen);
+  Record cur, next;
+  ComparisonEngine cmp;
+
+  // TODO: why not shutting down the input pipe here??
+  if(sorted.Remove(&cur)) {  // cur holds the current group
+    T sum = func->Apply<T>(cur);   // holds the sum for the current group
+    while(sorted.Remove(&next))
+      if(cmp.Compare(&cur, &next, order)) {
+        putGroup(cur, sum, out, order);
+        cur.Consume(&next);
+        sum = func->Apply<T>(cur);
+      } else sum += func->Apply<T>(next);
+    putGroup(cur, sum, out, order);    // put the last group into the output pipeline
+  }
+}
 
 #endif

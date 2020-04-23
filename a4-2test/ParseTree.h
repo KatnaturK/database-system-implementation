@@ -1,6 +1,5 @@
-
-#ifndef ParseFunc
-#define ParseFunc
+#ifndef PARSE_FUNC_H_
+#define PARSE_FUNC_H_
 
 // these are the types of operands that can appear in a CNF expression
 #define DOUBLE 1
