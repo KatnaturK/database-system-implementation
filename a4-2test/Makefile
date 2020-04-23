@@ -7,27 +7,27 @@ tag = -n
 endif
 
 .PHONY: all
-all: CXXFLAGS += -O2
+all: CXXFLAGS += -O2 -std=c++11
 all: a42.out
 
 .PHONY: debug
 debug: CXXFLAGS += -g -Wno-deprecated
 debug: CPPFLAGS += -DDEBUG
-debug: clean test.out
+debug: clean a42.out
 
-run: test.out
-	$(RM) *.tmp
-	$(CURDIR)/test.out 6
+# run: test.out
+# 	$(RM) *.tmp
+# 	$(CURDIR)/test.out 6
 
-a42.out: QueryPlan.o Statistics.o Record.o Comparison.o ComparisonEngine.o Schema.o File.o Pipe.o BigQ.o RelOp.o Function.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o  yyfunc.tab.o lex.yyfunc.o y.tab.o lex.yy.o test.o
+a42.out: Optimizer.o Statistics.o Record.o Comparison.o ComparisonEngine.o Schema.o File.o Pipe.o BigQ.o RelOp.o Function.o GenericDBFile.o DBFile.o HeapFile.o SortedFile.o  yyfunc.tab.o lex.yyfunc.o y.tab.o lex.yy.o a42.o
 	$(CXX) -o $@ $^ $(LDLIBS)
 
 test2.out: Record.o Comparison.o ComparisonEngine.o Schema.o File.o BigQ.o DBFile.o HeapFile.o SortedFile.o Pipe.o y.tab.o lex.yy.o test2.o
 	$(CXX) -o $@ $^ $(LDLIBS)
 
-test.o: ParseTree.h QueryPlan.h
+a42.o: ParseTree.h Optimizer.h
 test2.o: test2.h Pipe.h DBFile.h Record.h
-QueryPlan.o: QueryPlan.h Schema.h ParseTree.h Statistics.h Comparison.h
+Optimizer.o: Optimizer.h Schema.h ParseTree.h Statistics.h Comparison.h
 Statistics.o: Statistics.h ParseTree.h
 DBFile.o: DBFile.h Record.h Schema.h File.h Comparison.h ComparisonEngine.h Errors.h HeapFile.h SortedFile.h
 HeapFile.o: HeapFile.h DBFile.h Record.h Schema.h File.h Comparison.h ComparisonEngine.h Defs.h Errors.h

@@ -102,6 +102,8 @@ public:
         void GrowFromParseTree (struct AndList *parseTree, Schema *mySchema, 
 		Record &literal);
 
+	bool isEmpty() {return numAnds <= 0;}
+
 };
 
 #endif

@@ -1,5 +1,7 @@
 #include "BigQ.h"
 
+using namespace std;
+
 BigQ :: BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen): inPipe(in), outPipe(out), orderMarker(sortorder), runLength(runlen)  {
 	tmpFile = rndStr(15) + ".bin";
 	runFile.Open (0, const_cast<char *> (tmpFile.c_str()));
