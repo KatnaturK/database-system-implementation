@@ -94,8 +94,6 @@ protected:
   Statistics* stat;
 
   virtual void print(ostream& os = cout) const;
-  virtual void printOperator(ostream& os = cout) const;
-  virtual void printSchema(ostream& os = cout) const;
   virtual void printAnnot(ostream& os = cout) const = 0;
   virtual void printPipe(ostream& os) const = 0;
   virtual void printChildren(ostream& os) const = 0;

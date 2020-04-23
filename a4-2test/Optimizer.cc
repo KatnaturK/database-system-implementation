@@ -21,7 +21,7 @@ Optimizer::Optimizer(Statistics* inStats): stats(inStats), isUsedPrev(NULL), sel
   processWrite();
   swap(boolean, isUsedPrev);
   if (isUsedPrev) {
-    cout << "FATAL - WHERE clause syntax error." << endl;
+    cout << "ERROR !!! - WHERE clause syntax error." << endl;
 		exit(-1);
 	}
   printNodes();
@@ -33,15 +33,15 @@ Optimizer::Optimizer(Statistics* inStats): stats(inStats), isUsedPrev(NULL), sel
 int OptimizerNode::pipeId = 0;
 
 OptimizerNode::OptimizerNode(const string& inOperand, Schema* outSchema, Statistics* inStats):
-  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {}
+  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(++pipeId) {}
 
 OptimizerNode::OptimizerNode(const string& inOperand, Schema* outSchema, char* inRelation, Statistics* inStats):
-  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {
+  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(++pipeId) {
   if (inRelation) relations[relationCount++] = strdup(inRelation);
 }
 
 OptimizerNode::OptimizerNode(const string& inOperand, Schema* outSchema, char* inRelations[], size_t num, Statistics* inStats):
-  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(pipeId++) {
+  operand(inOperand), outSchema(outSchema), relationCount(0), processingEstimation(0), processingCost(0), stat(inStats), outPipeId(++pipeId) {
   for (; relationCount<num; ++relationCount)
     relations[relationCount] = strdup(inRelations[relationCount]);
 }
@@ -138,7 +138,8 @@ void Optimizer::constructLeafNodes() {
 }
 
 void LeafNode::printPipe(ostream& os) const {
-  os << "Output pipe: " << outPipeId << endl;
+  os << "Input Pipe: " << 0 << endl;
+  os << "Output Pipe: " << outPipeId << endl;
 }
 
 void LeafNode::printAnnot(ostream& os) const {}
@@ -166,12 +167,12 @@ ProjectNode::ProjectNode(NameList* inAtts, OptimizerNode* inOpNode):
   Schema* schema = inOpNode->outSchema;
   Attribute resultAtts[MAX_ATTRIBUTE_COUNT];
   if (schema->GetNumAtts() > MAX_ATTRIBUTE_COUNT) {
-    cout << "FATAL - Too many attributes." << endl;
+    cout << "ERROR !!! - Too many attributes." << endl;
 		exit(-1);
 	}
   for (; inAtts; inAtts=inAtts->next, numAttsOut++) {
     if ( (retainedAtts[numAttsOut] = schema->Find(inAtts->name)) == -1) {
-      cout << "FATAL - Projecting non-existing attribute." << endl;
+      cout << "ERROR !!! - Projecting non-existing attribute." << endl;
 		  exit(-1);
 	  }
     resultAtts[numAttsOut].name = inAtts->name; 
@@ -287,11 +288,11 @@ Schema* SumNode::resultSchema(FuncOperator* inParseTree, OptimizerNode* inOpNode
 void Optimizer::ProcessSums() {
   if (groupingAtts) {
     if (!finalFunction) {
-      cout << "FATAL - Grouping without aggregation functions!" << endl;
+      cout << "ERROR !!! - Grouping without aggregation functions!" << endl;
 		  exit(-1);
 	  }
     else if (distinctAtts) {
-      cout << "FATAL - No dedup after aggregate!" << endl;
+      cout << "ERROR !!! - No dedup after aggregate!" << endl;
 		  exit(-1);
 	  }
     if (distinctFunc) opRootNode = new DedupNode(opRootNode);
@@ -323,7 +324,7 @@ Schema* GroupByNode::resultSchema(NameList* inAtts, FuncOperator* inParseTree, O
   fun.GrowFromParseTree (inParseTree, *schema);
   Attribute resultAtts[MAX_ATTRIBUTE_COUNT];
   if (1 + schema->GetNumAtts() > MAX_ATTRIBUTE_COUNT) {
-    cout << "FATAL - Too many attributes." << endl;
+    cout << "ERROR !!! - Too many attributes." << endl;
     exit(-1);
   }
   resultAtts[0].name = "sum"; 
@@ -331,7 +332,7 @@ Schema* GroupByNode::resultSchema(NameList* inAtts, FuncOperator* inParseTree, O
   int numAtts = 1;
   for (; inAtts; inAtts=inAtts->next, numAtts++) {
     if (schema->Find(inAtts->name) == -1) {
-      cout << "FATAL - Grouping by non-existing attribute." << endl;
+      cout << "ERROR !!! - Grouping by non-existing attribute." << endl;
       exit(-1);
     }
     resultAtts[numAtts].name = inAtts->name; 
@@ -425,19 +426,11 @@ void Optimizer::printNodesInOrder(OptimizerNode* opNode, ostream& os) {
 
 void OptimizerNode::print(ostream& os) const {
   os << " *********** " << endl;
-  printOperator(os);
-  printPipe(os);
-  printSchema(os);
-  printAnnot(os);
-  os << "\n";
-}
-
-void OptimizerNode::printOperator(ostream& os) const {
   os << operand << " operation" << endl;
-}
-
-void OptimizerNode::printSchema(ostream& os) const {
+  printPipe(os);
   os << "Output schema:" << endl;
   outSchema->print(os);
+  printAnnot(os);
+  os << "\n";
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
