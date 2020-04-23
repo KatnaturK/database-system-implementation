@@ -2,11 +2,9 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string.h>
-
-#include "Comparison.h"
-#include "ParseTree.h"
-#include "Defs.h"
 #include "Errors.h"
+#include "Comparison.h"
+
 
 Comparison::Comparison()
 {
@@ -64,8 +62,18 @@ void Comparison :: Print () const {
 		cout << "(String)";
 }
 
+void OrderMaker::growFromParseTree(NameList* gAtts, Schema* inputSchema) {
+  for(; gAtts; gAtts = gAtts->next, numAtts++) {
+    FATALIF ((whichAtts[numAtts] = inputSchema->Find(gAtts->name))==-1,
+             "Grouping by non-existing attribute.");
+    whichTypes[numAtts] = inputSchema->FindType(gAtts->name);
+  }
+}
 
 
+OrderMaker :: OrderMaker() {
+	numAtts = 0;
+}
 
 OrderMaker :: OrderMaker(Schema *schema) {
 	numAtts = 0;
@@ -100,48 +108,8 @@ OrderMaker :: OrderMaker(Schema *schema) {
         }
 }
 
-OrderMaker::OrderMaker(int na, int* atts, Type* types): numAtts(na) {
-  FOREACH_ZIPPED_WITH_INDEX(att, type, atts, types, na, i)
-    UNPACK2(whichAtts[i], whichTypes[i], att, type);
-  END_FOREACH
-}
 
-void OrderMaker::queryOrderMaker(const OrderMaker& sortOrder, const CNF& query,
-                                 OrderMaker& queryorder, OrderMaker& cnforder)
-{
-  queryorder.numAtts = cnforder.numAtts = 0;
-  FOREACH_ZIPPED(att, type, sortOrder.whichAtts, sortOrder.whichTypes, sortOrder.numAtts)
-    int i = findAttrIn(att, query);
-    if (i>=0) {     // found this attribute in query CNF
-      UNPACK2(queryorder.whichAtts[queryorder.numAtts], queryorder.whichTypes[queryorder.numAtts], att, type);
-      UNPACK2(cnforder.whichAtts[cnforder.numAtts], cnforder.whichTypes[cnforder.numAtts], i, type);
-      ++queryorder.numAtts, ++cnforder.numAtts;
-    } else return;   // don't search further
-  END_FOREACH
-}
-
-int OrderMaker::findAttrIn(int att, const CNF& query) {
-  FOREACH_ZIPPED_WITH_INDEX(clause, orLen, query.orList, query.orLens, query.numAnds, i)
-    if (orLen==1) {
-      const Comparison& cmp = clause[0];
-      if (cmp.op == Equals
-          && (((cmp.whichAtt1==att) && (cmp.operand2==Literal))
-              ||(cmp.whichAtt2==att) && (cmp.operand1==Literal)))
-          return i;
-    }
-  END_FOREACH
-  return -1;
-}
-
-void OrderMaker::growFromParseTree(NameList* gAtts, Schema* inputSchema) {
-  for(; gAtts; gAtts = gAtts->next, numAtts++) {
-    FATALIF ((whichAtts[numAtts] = inputSchema->Find(gAtts->name))==-1,
-             "Grouping by non-existing attribute.");
-    whichTypes[numAtts] = inputSchema->FindType(gAtts->name);
-  }
-}
-
-void OrderMaker :: Print () const {
+void OrderMaker :: Print () {
 	printf("NumAtts = %5d\n", numAtts);
 	for (int i = 0; i < numAtts; i++)
 	{
@@ -155,23 +123,6 @@ void OrderMaker :: Print () const {
 	}
 }
 
-std::ostream& operator<<(std::ostream& os, const OrderMaker& myorder) {
-  os << myorder.numAtts << ' ';
-  for(int i=0; i<myorder.numAtts; ++i) os << myorder.whichAtts[i] << ' ';
-  for(int i=0; i<myorder.numAtts; ++i) os << myorder.whichTypes[i] << ' ';
-  os << std::endl;
-  return os;
-}
-
-std::istream& operator>>(std::istream& is, OrderMaker& myorder) {
-  is >> myorder.numAtts;
-  for(int i=0; i<myorder.numAtts; ++i) is >> myorder.whichAtts[i];
-  for(int i=0; i<myorder.numAtts; ++i) {
-    int t; is >> t;
-    myorder.whichTypes[i] = static_cast<Type>(t);
-  }
-  return is;
-}
 
 int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 
@@ -229,14 +180,10 @@ int CNF :: GetSortOrders (OrderMaker &left, OrderMaker &right) {
 	}
 	
 	return left.numAtts;
-
 }
 
 
 void CNF :: Print () const {
-
-  if (numAnds == 0)
-    cout << "<empty>" << endl;
 
 	for (int i = 0; i < numAnds; i++) {
 		

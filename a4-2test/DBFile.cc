@@ -1,92 +1,114 @@
 #include <fstream>
+#include <iostream>
 
-#include "Errors.h"
 #include "DBFile.h"
 #include "HeapFile.h"
 #include "SortedFile.h"
 
-using std::string;
-using std::ofstream;
+using namespace std;
 
-int DBFile::Create (char* fpath, fType ftype, void* startup) {
-  FATALIF(db!=NULL, "File already opened.");
-  createFile(ftype);
-  return db->Create(fpath, startup);
+DBFile::DBFile (): genericDBFile(NULL) {}
+
+DBFile::~DBFile () {
+  delete genericDBFile;
 }
 
-int DBFile::Open (char* fpath) {
-  FATALIF(db!=NULL, "File already opened.");
-  int ftype = HEAP;  // use heap file by default
-  ifstream ifs((DBFileBase::getTableName(fpath)+".meta").c_str());
-  if (ifs) {
-    ifs >> ftype;  // the first line contains file type
-    ifs.close();
+int DBFile::Open (char *filePath) {
+  
+  string tmpFilePath = filePath;
+  tmpFilePath = tmpFilePath + ".meta";
+  fstream outputFile (tmpFilePath.c_str (), fstream::in);
+  
+  runStruct run;
+  outputFile.read ((char *) & run, sizeof (runStruct));
+
+  fileTypeEnum fileType;
+  fileType = run.filetype;
+  fileType = heap;
+
+  cout << "FILE TYPE " << fileType << endl;
+
+  if (fileType == heap) {
+    // cout << "Trying to open Heap DBFIle";
+    genericDBFile = new HeapFile ();
+    return genericDBFile->Open (filePath);
+
+  } else if (fileType == sorted) {
+    // cout << "Trying to open Sorted DBFIle";
+    genericDBFile = new SortedFile ();
+    genericDBFile->sortOrder = run.sortOrder;
+    genericDBFile->runlen = run.runlength;
+    return genericDBFile->Open (filePath);
+
   }
-  createFile(static_cast<fType>(ftype));
-  return db->Open(fpath);
 }
 
-void DBFile::createFile(fType ftype) {
-  switch (ftype) {
-    case HEAP: db = new HeapFile; break;
-    case SORTED: db = new SortedFile; break;
-    default: db = NULL;
+int DBFile::Create (char *filePath, fileTypeEnum fileType, void *startup) {
+   
+  if (fileType == heap) {
+
+    string tmpFilePath = filePath;
+    tmpFilePath = tmpFilePath + ".meta";
+    fstream outputFile(tmpFilePath.c_str(), fstream::out);
+
+    runStruct run;
+    run.filetype = heap;
+    outputFile.write((char *) &run, sizeof(run));
+    outputFile.close();
+
+    genericDBFile = new HeapFile();
+    return  genericDBFile->Create(filePath, fileType, startup);
+
+  } else if (fileType == sorted) {
+
+    //cout << "Trying to create DBFile" << endl;
+    runStruct run;
+    run.filetype = sorted;
+    sort =(sortStruct*)startup;
+    
+    //cout << "Startup coded" << endl;
+    //cout << "Sorting order taken" << endl;
+    run.sortOrder = *(OrderMaker *)(sort->sortOrder);
+    run.runlength = sort->length;   
+
+    //cout << "trying to write" << endl;
+    string tmpFilePath = filePath;
+    tmpFilePath = tmpFilePath + ".meta";
+    fstream outputFile(tmpFilePath.c_str(), fstream::out);
+    outputFile.write((char *) &run, sizeof(runStruct));
+    // cout << "Metadata written" << endl;
+    outputFile.close();
+
+    // cout << "saving into myvar" << endl;
+    genericDBFile = new SortedFile(); 
+    genericDBFile->sortOrder = *(sort->sortOrder);
+    genericDBFile->runlen = sort->length;
+
+    // cout << "Sending to Sorted File" << endl;
+    return genericDBFile->Create(filePath, fileType, startup);
   }
-  FATALIF(db==NULL, "Invalid file type.");
 }
 
-int DBFile::Close() {
-  return db->Close();
+void DBFile::Load (Schema &fileSchema, char *loadPath) {
+  genericDBFile->Load (fileSchema,loadPath);
 }
 
-void DBFile::Add (Record& addme) {
-  return db->Add(addme);
+void DBFile::MoveFirst () {
+    genericDBFile->MoveFirst ();
 }
 
-void DBFile::Load (Schema& myschema, char* loadpath) {
-  return db->Load(myschema, loadpath);
+ int DBFile::Close () {
+   return genericDBFile->Close ();
+ }
+
+void DBFile::Add (Record &rec) {
+  genericDBFile->Add (rec);
 }
 
-void DBFile::MoveFirst() {
-  return db->MoveFirst();
+int DBFile::GetNext (Record &fetchMe) {
+  return genericDBFile->GetNext (fetchMe);
 }
 
-int DBFile::GetNext (Record& fetchme) {
-  return db->GetNext(fetchme);
-}
-
-int DBFile::GetNext (Record& fetchme, CNF& cnf, Record& literal) { 
-  return db->GetNext(fetchme, cnf, literal);
-}
-
-DBFile::DBFile(): db(NULL) {}
-DBFile::~DBFile() { delete db; }
-
-int DBFileBase::Create(char* fpath, void* startup) {
-  theFile.Open(0, fpath);
-  return 1;
-}
-
-int DBFileBase::Open (char* fpath) {
-  theFile.Open(1, fpath);
-  return 1;
-}
-
-void DBFileBase::Load (Schema& myschema, char* loadpath) {
-  startWrite();
-  FILE* ifp = fopen(loadpath, "r");
-  FATALIF(ifp==NULL, loadpath);
-
-  Record next;
-  curPage.EmptyItOut();  // creates the first page
-  while (next.SuckNextRecord(&myschema, ifp)) Add(next);
-  // theFile.addPage(&curPage);  // writes the last page  -- added in close()
-}
-
-int DBFileBase::GetNext (Record& fetchme) {
-  while (!curPage.GetFirst(&fetchme)) {
-    if(++curPageIdx > theFile.lastIndex()) return 0;  // no more records
-    theFile.GetPage(&curPage, curPageIdx);
-  }
-  return 1;
+int DBFile::GetNext (Record &fetchMe, CNF &cnf, Record &literal) {
+  return genericDBFile->GetNext (fetchMe, cnf, literal);
 }

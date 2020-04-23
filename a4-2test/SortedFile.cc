@@ -1,155 +1,205 @@
 #include <fstream>
-#include <stdio.h>    // rename
+#include <iostream>
 
-#include "Errors.h"
 #include "SortedFile.h"
-#include "HeapFile.h"
+#include "BigQ.h"
 
-#define safeDelete(p) {  \
-  delete p; p = NULL; }
+using namespace std;
 
-using std::ifstream;
-using std::ofstream;
-using std::string;
+SortedFile::SortedFile () {}
 
-extern char* catalog_path;
-extern char* dbfile_dir; 
-extern char* tpch_dir;
+SortedFile::~SortedFile () {}
 
-int SortedFile::Create (char* fpath, void* startup) {
-  table = getTableName((tpath=fpath).c_str());
-  typedef struct { OrderMaker* o; int l; } *pOrder;
-  pOrder po = (pOrder)startup;
-  myOrder = po -> o;
-  runLength = po -> l;
-  return DBFileBase::Create(fpath, startup);
+void SortedFile::ToggleMode (mode newMode){
+	if (fileMode == newMode)
+		return;
+	else {
+		if (newMode == read) {
+			runFile.AddPage (&p, pageNumber);
+            //cout << "Adding page number to disk : " << pageNumber << endl;
+			TwoPassMergeing ();
+			fileMode = read;
+			return;
+
+		} else {
+			p.EmptyItOut ();
+			pageNumber = runFile.GetLength () - 2;
+			runFile.GetPage (&p, pageNumber);
+			fileMode = write;
+			return;
+
+		}
+	}	
+} 
+
+void *producerWorker (void *arg) {
+	workerStruct *worker = (workerStruct *) arg;
+	int count = 0;
+	Record tmpRec;
+	
+	if (worker->loadPath != NULL) {
+		//cout << "load producer" << endl;
+		FILE *tmpFile = fopen (worker->loadPath, "r");
+
+		while (tmpRec.SuckNextRecord (worker->fileSchema, tmpFile)) {
+			count += 1;
+			worker->pipe->Insert (&tmpRec);
+		}
+
+	} else {
+		//cout << "Merging producer" <<  endl;
+		//cout << "Total pages: " << worker->f->GetLength() -2 << endl;
+		int currPageCount = 0;
+		Page p2;
+		worker->file->GetPage (&p2, currPageCount);
+
+		while (true) {
+
+			if (!p2.GetFirst (&tmpRec)) {
+				if(currPageCount < worker->file->GetLength () -2) {
+					currPageCount++;
+					//cout << "incrementing pages: " << currPageCount<< endl;
+					worker->file->GetPage (&p2,currPageCount);
+					if (!p2.GetFirst (&tmpRec))
+						break; // No More records to read
+				
+				} else
+					break; //cout << "End of pages: " << currPageCount<< endl;
+			}
+
+			worker->pipe->Insert (&tmpRec);
+			count++;
+
+		}
+	}
+	//cout << "Inserted records by merge prod: " << count<< endl;
+	worker->pipe->ShutDown ();
 }
 
-int SortedFile::Open (char* fpath) {
-  allocMem();
-  table = getTableName((tpath=fpath).c_str());
-  int ftype;
-  ifstream ifs(metafName());
-  FATALIF(!ifs, "Meta file missing.");
-  ifs >> ftype >> *myOrder >> runLength;
-  ifs.close();
-  return DBFileBase::Open(fpath);
+void *consumerWorker (void *arg) {
+
+	workerStruct *worker = (workerStruct *) arg;
+	ComparisonEngine ce;
+	int count =0, currPageCount =0;
+	Page page;
+	Record rec;
+
+	while (worker->pipe->Remove (&rec)) {
+		count++;
+		if (!page.Append(&rec)) {
+			worker->file->AddPage (&page, currPageCount);
+			page.EmptyItOut ();
+			page.Append (&rec);
+			currPageCount++;
+
+		}
+	}
+	worker->file->AddPage (&page, currPageCount);
+	page.EmptyItOut ();
+
 }
 
-int SortedFile::Close() {
-  ofstream ofs(metafName());  // write meta data
-  ofs << "1\n" << *myOrder << '\n' << runLength << std::endl;
-  ofs.close();
-  if(mode==WRITE) merge();  // write actual data
-  freeMem();
-  return theFile.Close();
+void SortedFile::TwoPassMergeing () {
+	int buffer = 100; // pipe cache size
+	Pipe input (buffer);
+	Pipe output (buffer);
+
+	pthread_t thread_1;
+	workerStruct inPipe = {&input, &sortOrder,NULL, &runFile, NULL  };
+	pthread_create (&thread_1, NULL, producerWorker, (void *)&inPipe);
+
+	pthread_t thread_2;
+	workerStruct outPipe = {&output, &sortOrder,NULL, &runFile, NULL };
+	pthread_create (&thread_2, NULL, consumerWorker, (void *)&outPipe);
+
+	BigQ bq (input, output, sortOrder, runlen);
+
+	pthread_join (thread_1, NULL);
+	pthread_join (thread_2, NULL);
+
 }
 
-void SortedFile::Add (Record& addme) {
-  startWrite();
-  in->Insert(&addme);
+int SortedFile::Create (char *filePath, fileTypeEnum fileType, void *startup) {
+
+	fstatus.open (filePath);
+	runFile.Open (0,filePath);
+	runFile.AddPage (&p,0);
+	pageNumber = 0;
+	fileMode = write;
+	pageCount = 1;
+                
+	return 1;
 }
 
-void SortedFile::Load (Schema& myschema, char* loadpath) {
-  startWrite();
-  DBFileBase::Load(myschema, loadpath);
+void SortedFile::Load (Schema &fileSchema, char *loadPath) {}
+
+int SortedFile::Open (char *filePath) {
+	p.EmptyItOut ();
+	runFile.Open (1, filePath);
+	fileMode = read;
+	pageCount = runFile.GetLength ();
+	MoveFirst ();
+
+	return 1;
 }
 
 void SortedFile::MoveFirst () {
-  startRead();
-  theFile.GetPage(&curPage, curPageIdx=0);
+	//cout << "In Move first function switch called to R actual mode: " << status << endl;
+	ToggleMode (read);
+	p.EmptyItOut ();
+	pageNumber = 0;
+	runFile.GetPage (&p, pageNumber);
+
 }
 
-int SortedFile::GetNext (Record& fetchme) {
-  /* TODO: We don't need to switch mode here, do we?? */
-  // startRead();
-  return DBFileBase::GetNext(fetchme);
+int SortedFile::Close () {
+	//cout << "In close function switch called to R actual mode: " << status << endl;
+    ToggleMode (read);
+	p.EmptyItOut ();
+	runFile.Close ();
+
+	return 1;
 }
 
-int SortedFile::GetNext (Record& fetchme, CNF& cnf, Record& literal) {
-  // startRead();
-  OrderMaker queryorder, cnforder;
-  OrderMaker::queryOrderMaker(*myOrder, cnf, queryorder, cnforder);
-  ComparisonEngine cmp;
-  if (!binarySearch(fetchme, queryorder, literal, cnforder, cmp)) return 0; // query part should equal
-  do {
-    if (cmp.Compare(&fetchme, &queryorder, &literal, &cnforder)) return 0; // query part should equal
-    if (cmp.Compare(&fetchme, &literal, &cnf)) return 1;   // matched
-  } while(GetNext(fetchme));
-  return 0;  // no matching records
+void SortedFile::Add (Record &rec) {
+	//cout << "In Add function switch called to W actual mode: " << status << endl;
+	ToggleMode (write);
+	if (!p.Append (&rec)) {
+		runFile.AddPage (&p, pageNumber);
+		p.EmptyItOut ();
+		pageCount++;
+		pageNumber++;
+		p.Append (&rec);
+
+	}	
 }
 
-void SortedFile::merge() {
-  in->ShutDown();
-  Record fromFile, fromPipe;
-  bool fileNotEmpty = !theFile.empty(), pipeNotEmpty = out->Remove(&fromPipe);
 
-  HeapFile tmp;
-  tmp.Create(const_cast<char*>(tmpfName()), NULL);  // temporary file for the merge result; will be renamed in the end
-  ComparisonEngine ce;
+int SortedFile::GetNext (Record &fetchMe) {
+	//cout << "In get next function switch called to R actual mode: " << status << endl;
+	ToggleMode (read);
+	if (p.GetFirst (&fetchMe))
+		return 1;
+	else {
+		if (pageNumber < pageCount - 2) {
+			pageNumber++;
+			runFile.GetPage(&p,pageNumber);
+			if(GetNext(fetchMe))
+				return 1;
+		}
+		return 0;
 
-  // initialize
-  if (fileNotEmpty) {
-    theFile.GetPage(&curPage, curPageIdx=0);           // move first
-    fileNotEmpty = GetNext(fromFile);
-  }
-
-  // two-way merge
-  while (fileNotEmpty || pipeNotEmpty)
-    if (!fileNotEmpty || (pipeNotEmpty && ce.Compare(&fromFile, &fromPipe, myOrder) > 0)) {
-      tmp.Add(fromPipe);
-      pipeNotEmpty = out->Remove(&fromPipe);
-    } else if (!pipeNotEmpty
-               || (fileNotEmpty && ce.Compare(&fromFile, &fromPipe, myOrder) <= 0)) {
-      tmp.Add(fromFile);
-      fileNotEmpty = GetNext(fromFile);
-    } else FATAL("Two-way merge failed.");
-
-  // write back
-  tmp.Close();
-  FATALIF(rename(tmpfName(), tpath.c_str()), "Merge write failed.");  // rename returns 0 on success
-  deleteQ();
+	}	
 }
 
-int SortedFile::binarySearch(Record& fetchme, OrderMaker& queryorder, Record& literal, OrderMaker& cnforder, ComparisonEngine& cmp) {
-  // the initialization part deals with successive calls:
-  // after a binary search, the first record matches the literal and no furthur binary search is necessary
-  if (!GetNext(fetchme)) return 0;
-  int result = cmp.Compare(&fetchme, &queryorder, &literal, &cnforder);
-  if (result > 0) return 0;
-  else if (result == 0) return 1;
-
-  // binary search -- this finds the page (not record) that *might* contain the record we want
-  off_t low=curPageIdx, high=theFile.lastIndex(), mid=(low+high)/2;
-  for (; low<mid; mid=(low+high)/2) {
-    theFile.GetPage(&curPage, mid);
-    FATALIF(!GetNext(fetchme), "empty page found");
-    result = cmp.Compare(&fetchme, &queryorder, &literal, &cnforder);
-    if (result<0) low = mid;
-    else if (result>0) high = mid-1;
-    else high = mid;  // even if they're equal, we need to find the *first* such record
-  }
-
-  theFile.GetPage(&curPage, low);
-  do {   // scan the located page for the record matching record literal
-    if (!GetNext(fetchme)) return 0;
-    result = cmp.Compare(&fetchme, &queryorder, &literal, &cnforder);
-  } while (result<0);
-  return result==0;
-}
-
-const char* SortedFile::metafName() const {
-  std::string p(dbfile_dir);
-  return (p+table+".meta").c_str();
-}
-
-void SortedFile::allocMem() {
-  FATALIF (myOrder != NULL, "File already open.");
-  myOrder = new OrderMaker();
-  useMem = true;
-}
-
-void SortedFile::freeMem() {
-  if (useMem) safeDelete(myOrder);
-  useMem = false;
+int SortedFile::GetNext (Record &fetchMe, CNF &cnf, Record &literal) {
+	//cout << "In get next cnf function switch called to R actual mode: " << status << endl;
+	ToggleMode (read);
+    ComparisonEngine ce;
+	while (GetNext (fetchMe)) {
+		if (ce.Compare (&fetchMe, &literal, &cnf))
+			return 1;
+	}
+	
+	return 0;
 }

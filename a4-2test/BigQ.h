@@ -1,72 +1,51 @@
 #ifndef BIGQ_H
 #define BIGQ_H
-#include <pthread.h>
-#include <iostream>
-#include <queue>
+#pragma once
+
+
 #include <algorithm>
-#include "Pipe.h"
+#include <iostream>
+#include <pthread.h>
+#include <stdio.h>
+#include <string>
+#include <queue>
+#include <vector>
+
+#include "ComparisonEngine.h"
+#include "DBFile.h"
 #include "File.h"
+#include "Pipe.h"
 #include "Record.h"
 
-class Page;
-class File;
-
+class DBFile; 
 
 using namespace std;
 
-class Sorter{
-public:
-	Sorter(OrderMaker &sortorder);
-	bool operator()(Record* i, Record* j) ;
-private:
-		OrderMaker & _sortorder;
-};
-
-class Sorter2{
-public:
-	Sorter2(OrderMaker &sortorder);
-	bool operator()(pair<int, Record *> i, pair<int, Record *> j) ;
-private:
-		OrderMaker & _sortorder;
-};
-
-
-// make sure to set a seed before generating the temporary file.
 class BigQ {
 public:
-	Pipe &Qin;
-	Pipe &Qout;
-	OrderMaker &Qsortorder;
-	int Qrunlen;
-	Sorter mysorter;
-	Sorter2 mysorter2;
-
-	Page *curPage;
-	File *theFile;
-	
-	pthread_t worker;
-public:
-
 	BigQ (Pipe &in, Pipe &out, OrderMaker &sortorder, int runlen);
 	~BigQ ();
 
-	static void *Working(void *biq);
+	static void * bigQRoutine(void *bigQ);
 
 private:
-  static int cnt;
-  static const char* tmpfName();
-  static void genRandom(char *s, const int len) {
-    static const char alphanum[] =
-      "0123456789"
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-      "abcdefghijklmnopqrstuvwxyz";
-
-    for (int i = 0; i < len; ++i) {
-      s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-    }
-
-    s[len] = 0;
-  }
+	DBFile * dbFile;
+	File runFile;
+	int runLength;
+	OrderMaker &orderMarker;
+	Pipe &inPipe, &outPipe;
+	pthread_t bigQthread;
+	string tmpFile;
+	std::string rndStr (size_t length) {
+		auto rndChar = [] () -> char {
+			const char chrArr[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+			const size_t index = (sizeof(chrArr) - 1);
+			return chrArr[ rand() % index ];
+		};
+		std::string str (length, 0);
+		std::generate_n (str.begin(), length, rndChar);
+		return str;
+	}
 };
 
 #endif

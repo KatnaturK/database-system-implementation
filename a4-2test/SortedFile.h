@@ -1,87 +1,42 @@
-#ifndef SORTED_FILE_H_
-#define SORTED_FILE_H_
+#ifndef SORTEDFILE_H
+#define SORTEDFILE_H
 
-#include <string>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 
-#include "DBFile.h"
-#include "Pipe.h"
-#include "BigQ.h"
-#include "Defs.h"
+#include "GenericDBFile.h"
 
-class SortedFile: protected DBFileBase {
-  static const size_t PIPE_BUFFER_SIZE = PIPE_SIZE;
-  friend class DBFile;
-  using DBFileBase::GetNext;
+using namespace std;
 
-protected:
-  SortedFile(): myOrder(NULL), runLength(0),
-                in(NULL), out(NULL), biq(NULL), useMem(false) {}
-  ~SortedFile() {}
+typedef struct {
+        Pipe *pipe;
+        OrderMaker *sortOrder;
+        Schema *fileSchema;
+        File *file;
+        char* loadPath;
+} workerStruct;
 
-  int Create (char* fpath, void* startup);
-  int Open (char* fpath);
-  int Close ();
+typedef enum {read, write} mode;
 
-  void Add (Record& addme);
-  void Load (Schema& myschema, char* loadpath);
 
-  void MoveFirst();
-  int GetNext (Record& fetchme);
-  int GetNext (Record& fetchme, CNF& cnf, Record& literal);
+class SortedFile : virtual public  GenericDBFile {
 
-protected:
-  void startWrite();
-  void startRead();
+public:
+        SortedFile ();
+        ~SortedFile();
 
-private:
-  OrderMaker* myOrder;    // may come from startup or meta file; need to differentiate
-  int runLength;
+        mode fileMode;
 
-  std::string tpath;
-  std::string table;
-  
-  Pipe *in, *out;
-  BigQ *biq;
-
-  const char* metafName() const; // meta file name
-  inline const char* tmpfName() const;  // temp file name used in the merge phase
-
-  void merge();    // merge BigQ and File
-  int binarySearch(Record& fetchme, OrderMaker& queryorder, Record& literal, OrderMaker& cnforder, ComparisonEngine& cmp);
-
-  bool useMem;     // this is used to indicate whether SortInfo is passed or created
-                   // is is default to false, and set in allocMem()
-  void allocMem();
-  void freeMem();
-
-  void createQ() {
-    in = new Pipe(PIPE_BUFFER_SIZE), out = new Pipe(PIPE_BUFFER_SIZE);
-    biq = new BigQ(*in, *out, *myOrder, runLength);
-  }
-
-  void deleteQ() {
-    delete biq; delete in; delete out;
-    biq = NULL, in = out = NULL;
-  }
-
-  SortedFile(const SortedFile&);
-  SortedFile& operator=(const SortedFile&);
+        void Add (Record &rec);
+        int Close ();
+        int Create (char *filePath, fileTypeEnum fileEnum, void *startup);
+        int GetNext (Record &fetchMe);
+        int GetNext (Record &fetchMe, CNF &cnf, Record &literal);
+        void Load (Schema &fileSchema, char *loadpath);
+        void MoveFirst ();
+        int Open (char *filePath);
+	void ToggleMode(mode nextMode);
+        void TwoPassMergeing ();
 };
-
-const char* SortedFile::tmpfName() const {
-  return (tpath+".tmp").c_str();
-}
-
-inline void SortedFile::startRead() {
-  if (mode==READ) return;
-  mode = READ;
-  merge();   // merge will delete BigQ in the end
-}
-
-inline void SortedFile::startWrite() {
-  if (mode==WRITE) return;
-  mode = WRITE;
-  createQ();
-}
-
 #endif

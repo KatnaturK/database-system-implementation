@@ -1,40 +1,21 @@
-#ifndef HEAP_FILE_H_
-#define HEAP_FILE_H_
+#ifndef HEAPFILE_H
+#define HEAPFILE_H
 
-#include "DBFile.h"
+#include "GenericDBFile.h"
 
-class HeapFile: protected DBFileBase {
-  friend class DBFile;
-  friend class SortedFile;   // sort file used a temp heap file for merging
-  using DBFileBase::GetNext;
-protected:
-  HeapFile (); 
-  ~HeapFile() {}
+class HeapFile : virtual public GenericDBFile {
 
-  int Close ();
-  void Add (Record& me);
+public:
+        HeapFile ();
+        ~HeapFile();
 
-  void MoveFirst();
-  int GetNext (Record& fetchme, CNF& cnf, Record& literal);
-
-protected:
-  void startWrite() { mode = WRITE; }
-  void startRead();
-
-private:
-  void addtoNewPage(Record& rec) {
-    curPage.EmptyItOut();
-    curPage.Append(&rec);
-  }
-
-  HeapFile(const HeapFile&);
-  HeapFile& operator=(const HeapFile&);
+        void Add (Record &addme);
+        int Close ();
+        int Create (char *filePath, fileTypeEnum fileType, void *startup);
+        int GetNext (Record &fetchMe);
+        int GetNext (Record &fetchMe, CNF &cnf, Record &literal);   
+        void Load (Schema &fileSchema, char *loadPath);
+        void MoveFirst ();
+        int Open (char *filePath);
 };
-
-inline void HeapFile::startRead() {
-  if (mode == READ) return;
-  mode = READ;
-  if (!curPage.empty()) theFile.addPage(&curPage);
-}
-
 #endif

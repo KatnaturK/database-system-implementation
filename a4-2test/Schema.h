@@ -2,6 +2,8 @@
 #ifndef SCHEMA_H
 #define SCHEMA_H
 
+#include <iostream>
+#include <fstream>
 #include <stdio.h>
 #include "Record.h"
 #include "Schema.h"
@@ -10,11 +12,12 @@
 #include "ComparisonEngine.h"
 
 struct att_pair {
-        char* name;
+	char *name;
 	Type type;
 };
 struct Attribute {
-	char* name;
+
+	char *name;
 	Type myType;
 };
 
@@ -47,20 +50,24 @@ public:
 	Type FindType (char *attName);
 
 	// this reads the specification for the schema in from a file
-        Schema (char *fName, char *relName, const char* alias = "");
+	// Schema (char *fName, char *relName);
 
 	// this composes a schema instance in-memory
 	Schema (char *fName, int num_atts, Attribute *atts);
 
-        // this combines two schemas, used as the result schema of a join
-        Schema (const Schema& left, const Schema& right);
+	// this reads the specification for the schema in from a file
+    Schema (char *fName, char *relName, const char* alias = "");
+
+    // this combines two schemas, used as the result schema of a join
+    Schema (const Schema& left, const Schema& right);
 
 	// this constructs a sort order structure that can be used to
 	// place a lexicographic ordering on the records using this type of schema
 	int GetSortOrder (OrderMaker &order);
 
-  void print(std::ostream& os = std::cout) const;
 	~Schema ();
+
+    void print(std::ostream& os = std::cout) const;
 
 };
 

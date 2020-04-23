@@ -52,6 +52,9 @@ Pipe.o: Pipe.cc
 BigQ.o: BigQ.cc
 	$(CC) -g -c BigQ.cc
 
+Operator.o: Operator.cc
+	$(CC) -g -c Operator.cc
+
 RelOp.o: RelOp.cc
 	$(CC) -g -c RelOp.cc
 

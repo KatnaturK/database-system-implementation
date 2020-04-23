@@ -1,20 +1,17 @@
 #ifndef COMPARISON_H
 #define COMPARISON_H
 
-#include <iostream>
-
 #include "Record.h"
 #include "Schema.h"
 #include "File.h"
 #include "Comparison.h"
 #include "ComparisonEngine.h"
-
+#include <stdlib.h>
 
 // This stores an individual comparison that is part of a CNF
 class Comparison {
 
 	friend class ComparisonEngine;
-        friend class OrderMaker;
 	friend class CNF;
 
 	Target operand1;
@@ -39,50 +36,33 @@ public:
 
 
 class Schema;
-class CNF;
 
 // This structure encapsulates a sort order for records
 class OrderMaker {
+
 	friend class ComparisonEngine;
 	friend class CNF;
+
+public:
 
 	int numAtts;
 
 	int whichAtts[MAX_ANDS];
 	Type whichTypes[MAX_ANDS];
 
-public:
 	
+
 	// creates an empty OrdermMaker
-        OrderMaker(): numAtts(0) {}
+	OrderMaker();
 
 	// create an OrderMaker that can be used to sort records
 	// based upon ALL of their attributes
 	OrderMaker(Schema *schema);
 
-        OrderMaker(int na, int* atts, Type* types);
-
-        int getNumAtts() const { return numAtts; }
-        const int* getAtts() const { return whichAtts; }
-
-        // construct a query order to answer query based on the sort information.
-        // used in sorted file implementation.
-        static void queryOrderMaker(const OrderMaker& sortOrder, const CNF& query,
-                                    OrderMaker& queryorder, OrderMaker& cnforder);
-
-        void growFromParseTree(NameList* gAtts, Schema* inputSchema); 
-
 	// print to the screen
-	void Print () const;
+	void Print ();
 
-  // read/write OrderMaker in text format
-  friend std::ostream& operator<<(std::ostream& os, const OrderMaker& myorder);
-  friend std::istream& operator>>(std::istream& is, OrderMaker& myorder);
-
-private:
-  // find an attribute in the given query.
-  // returns its index or -1 if not found.
-  static int findAttrIn(int att, const CNF& query);
+	void growFromParseTree(NameList* gAtts, Schema* inputSchema);
 };
 
 class Record;
@@ -91,7 +71,7 @@ class Record;
 // during query execution
 
 class CNF {
-        friend class OrderMaker;
+
 	friend class ComparisonEngine;
 
 	Comparison orList[MAX_ANDS][MAX_ORS];
@@ -121,6 +101,7 @@ public:
         // a relational selection over a single relation so only one schema is used
         void GrowFromParseTree (struct AndList *parseTree, Schema *mySchema, 
 		Record &literal);
+
 };
 
 #endif
