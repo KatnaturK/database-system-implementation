@@ -11,16 +11,6 @@
   nodeType* newNode = new nodeType params;                              \
   concatList(recycler, pushed);
 
-#define freeAll(freeList)                                        \
-  for (size_t __ii = 0; __ii < freeList.size(); ++__ii) {        \
-    --freeList[__ii]->pipeId; free(freeList[__ii]);  } 
-
-#define makeAttr(newAttr, name1, type1)                 \
-  newAttr.name = name1; newAttr.myType = type1;
-
-#define indent(level) (string(3*(level), ' ') + "-> ")
-#define annot(level) (string(3*(level+1), ' ') + "* ")
-
 
 Optimizer::Optimizer(Statistics* inStats): stats(inStats), isUsedPrev(NULL), selectQeryCount(0), joinQueryCount(0) {
   constructLeafNodes(); 
@@ -30,7 +20,10 @@ Optimizer::Optimizer(Statistics* inStats): stats(inStats), isUsedPrev(NULL), sel
   processDistinct();
   processWrite();
   swap(boolean, isUsedPrev);
-  FATALIF(isUsedPrev, "WHERE clause syntax error.");
+  if (isUsedPrev) {
+    cout << "FATAL - WHERE clause syntax error." << endl;
+		exit(-1);
+	}
   printNodes();
 }
 
@@ -172,11 +165,17 @@ ProjectNode::ProjectNode(NameList* inAtts, OptimizerNode* inOpNode):
   UnaryNode("PROJECT", NULL, inOpNode, NULL), inputAttsCount(inOpNode->outSchema->GetNumAtts()), numAttsOut(0) {
   Schema* schema = inOpNode->outSchema;
   Attribute resultAtts[MAX_ATTRIBUTE_COUNT];
-  FATALIF (schema->GetNumAtts()>MAX_ATTRIBUTE_COUNT, "Too many attributes.");
+  if (schema->GetNumAtts() > MAX_ATTRIBUTE_COUNT) {
+    cout << "FATAL - Too many attributes." << endl;
+		exit(-1);
+	}
   for (; inAtts; inAtts=inAtts->next, numAttsOut++) {
-    FATALIF ((retainedAtts[numAttsOut]=schema->Find(inAtts->name))==-1,
-             "Projecting non-existing attribute.");
-    makeAttr(resultAtts[numAttsOut], inAtts->name, schema->FindType(inAtts->name));
+    if ( (retainedAtts[numAttsOut] = schema->Find(inAtts->name)) == -1) {
+      cout << "FATAL - Projecting non-existing attribute." << endl;
+		  exit(-1);
+	  }
+    resultAtts[numAttsOut].name = inAtts->name; 
+    resultAtts[numAttsOut].myType = schema->FindType(inAtts->name);
   }
   outSchema = new Schema ("", numAttsOut, resultAtts);
 }
@@ -240,8 +239,14 @@ int Optimizer::evalOrder(vector<OptimizerNode*> operands, Statistics inStats, in
     if (newJoinNode->processingEstimation<=0 || newJoinNode->processingCost>bestFound) 
       break;
   }
+
   int processingCost = operands.back()->processingCost;
-  freeAll(freeNodeList);
+
+  for (int i = 0; i < freeNodeList.size(); ++i) {
+    --freeNodeList[i]->pipeId; 
+    free(freeNodeList[i]);
+  }
+
   concatList(boolean, needsRecycling); 
   return operands.back()->processingEstimation<0 ? -1 : processingCost;
 }
@@ -281,17 +286,23 @@ Schema* SumNode::resultSchema(FuncOperator* inParseTree, OptimizerNode* inOpNode
 
 void Optimizer::ProcessSums() {
   if (groupingAtts) {
-    FATALIF (!finalFunction, "Grouping without aggregation functions!");
-    FATALIF (distinctAtts, "No dedup after aggregate!");
+    if (!finalFunction) {
+      cout << "FATAL - Grouping without aggregation functions!" << endl;
+		  exit(-1);
+	  }
+    else if (distinctAtts) {
+      cout << "FATAL - No dedup after aggregate!" << endl;
+		  exit(-1);
+	  }
     if (distinctFunc) opRootNode = new DedupNode(opRootNode);
-    opRootNode = new GroupByNode(groupingAtts, finalFunction, opRootNode);
+      opRootNode = new GroupByNode(groupingAtts, finalFunction, opRootNode);
   } else if (finalFunction) {
     opRootNode = new SumNode(finalFunction, opRootNode);
   }
 }
 
 void SumNode::printAnnot(ostream& os) const {
-  os << "Function: "; (const_cast<Function*>(&function))->Print();
+  os << "FUNCTION "; (const_cast<Function*>(&function))->Print();
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
@@ -308,22 +319,32 @@ GroupByNode::GroupByNode(NameList* inAtts, FuncOperator* inParseTree, OptimizerN
 Schema* GroupByNode::resultSchema(NameList* inAtts, FuncOperator* inParseTree, OptimizerNode* inOpNode) {
   Function fun;
   Attribute atts[2][1] = {{{"sum", Int}}, {{"sum", Double}}};
-  Schema* cSchema = inOpNode->outSchema;
-  fun.GrowFromParseTree (inParseTree, *cSchema);
+  Schema* schema = inOpNode->outSchema;
+  fun.GrowFromParseTree (inParseTree, *schema);
   Attribute resultAtts[MAX_ATTRIBUTE_COUNT];
-  FATALIF (1+cSchema->GetNumAtts()>MAX_ATTRIBUTE_COUNT, "Too many attributes.");
-  makeAttr(resultAtts[0], "sum", fun.resultType());
+  if (1 + schema->GetNumAtts() > MAX_ATTRIBUTE_COUNT) {
+    cout << "FATAL - Too many attributes." << endl;
+    exit(-1);
+  }
+  resultAtts[0].name = "sum"; 
+  resultAtts[0].myType = fun.resultType();
   int numAtts = 1;
   for (; inAtts; inAtts=inAtts->next, numAtts++) {
-    FATALIF (cSchema->Find(inAtts->name)==-1, "Grouping by non-existing attribute.");
-    makeAttr(resultAtts[numAtts], inAtts->name, cSchema->FindType(inAtts->name));
+    if (schema->Find(inAtts->name) == -1) {
+      cout << "FATAL - Grouping by non-existing attribute." << endl;
+      exit(-1);
+    }
+    resultAtts[numAtts].name = inAtts->name; 
+    resultAtts[numAtts].myType = schema->FindType(inAtts->name);
+    
   }
   return new Schema ("", numAtts, resultAtts);
 }
 
 void GroupByNode::printAnnot(ostream& os) const {
-  os << "OrderMaker: "; (const_cast<OrderMaker*>(&orderMakerGrp))->Print();
-  os << "Function: "; (const_cast<Function*>(&function))->Print();
+  // os << "OrderMaker: "; (const_cast<OrderMaker*>(&orderMakerGrp))->Print();
+  os << "GROUPING ON" << endl;
+  os << "FUNCTION "; (const_cast<Function*>(&function))->Print();
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
@@ -368,6 +389,9 @@ void Optimizer::printNodes(ostream& os) {
     for (NameList* att = groupingAtts; att; att = att->next)
       os << att->name << " ";
     os << endl;
+    for(NameList* att = groupingAtts; att; att = att->next) {
+      os << "		" << "Att " << att->name << endl;
+    }
   }
   os << "PRINTING TREE IN ORDER:\n\n";
   OptimizerNode* opNode = opRootNode;
@@ -400,7 +424,7 @@ void Optimizer::printNodesInOrder(OptimizerNode* opNode, ostream& os) {
 }
 
 void OptimizerNode::print(ostream& os) const {
-  os << "************" << endl;
+  os << " *********** " << endl;
   printOperator(os);
   printPipe(os);
   printSchema(os);

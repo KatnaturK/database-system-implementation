@@ -2,9 +2,10 @@ TC6
 Number of selects: 1
 Number of joins: 2
 GROUPING ON s.s_suppkey 
+		Att s.s_suppkey
 PRINTING TREE IN ORDER:
 
-************
+ *********** 
 SELECT FILE operation
 Output pipe: 3
 Output schema:
@@ -18,7 +19,7 @@ Output schema:
 		Att p.p_retailprice DOUBLE
 		Att p.p_comment STRING
 
-************
+ *********** 
 SELECT FILE operation
 Output pipe: 1
 Output schema:
@@ -30,7 +31,7 @@ Output schema:
 		Att s.s_acctbal DOUBLE
 		Att s.s_comment STRING
 
-************
+ *********** 
 SELECT PIPE operation
 Input pipe: 1
 Output pipe: 2
@@ -45,7 +46,7 @@ Output schema:
 SELECTION CNF: 
 ( s.s_acctbal > s.s_suppkey ) 
 
-************
+ *********** 
 JOIN operation
 Left input pipe: 3
 Right input pipe: 2
@@ -69,7 +70,7 @@ Output schema:
 		Att s.s_comment STRING
 CNF: 
 
-************
+ *********** 
 SELECT FILE operation
 Output pipe: 0
 Output schema:
@@ -79,7 +80,7 @@ Output schema:
 		Att ps.ps_supplycost DOUBLE
 		Att ps.ps_comment STRING
 
-************
+ *********** 
 JOIN operation
 Left input pipe: 4
 Right input pipe: 0
@@ -110,14 +111,13 @@ CNF:
 ( s.s_suppkey = ps.ps_suppkey )  AND
 ( p.p_partkey = ps.ps_partkey ) 
 
-************
+ *********** 
 GROUP BY operation
 Input pipe: 5
 Output pipe: 6
 Output schema:
 		Att sum DOUBLE
 		Att s.s_suppkey INT
-OrderMaker: NumAtts =     1
-  0:     9 Int
-Function: 
+GROUPING ON
+FUNCTION 
 ***************************************************************************************************************************

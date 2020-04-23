@@ -10,12 +10,10 @@
 
 #include "Comparison.h"
 #include "Defs.h"
-#include "Errors.h"
 #include "Function.h"
 #include "ParseTree.h"
 #include "Schema.h"
 #include "Statistics.h"
-#include "Stl.h"
 
 #define MAX_ATTRIBUTE_COUNT 100
 #define MAX_RELATION_COUNT 12
