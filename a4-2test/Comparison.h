@@ -60,7 +60,7 @@ public:
 	OrderMaker(Schema *schema);
 
 	// print to the screen
-	void Print ();
+	void Print (Schema* outSchema);
 
 	void growFromParseTree(NameList* gAtts, Schema* inputSchema);
 };

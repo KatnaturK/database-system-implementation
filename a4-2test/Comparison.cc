@@ -119,18 +119,18 @@ OrderMaker :: OrderMaker(Schema *schema) {
 }
 
 
-void OrderMaker :: Print () {
-	printf("NumAtts = %5d\n", numAtts);
-	for (int i = 0; i < numAtts; i++)
-	{
-		printf("%3d: %5d ", i, whichAtts[i]);
-		if (whichTypes[i] == Int)
-			printf("Int\n");
-		else if (whichTypes[i] == Double)
-			printf("Double\n");
-		else
-			printf("String\n");
-	}
+void OrderMaker :: Print (Schema* outSchema) {
+	const char* typenames[3] = {"INT", "DOUBLE", "STRING"};
+	cout << " number of attributes = " << numAtts << endl;
+	// for (int i = 0; i < numAtts; i++) {
+	// 	int attributeNo = whichAtts[i];
+	// 	char* attributeType = "STRING";
+	// 	if(whichTypes[i] == Int) attributeType = "INT";
+	// 	else if(whichTypes[i] == Double) attributeType = "DOUBLE";
+	// 	cout << "		" << "Att " << attributeNo << ": " << attributeType << endl;
+	// 	// cout << outSchema->myAtts[whichAtt1].name << " ";
+	// 	// cout << "		" << "Att "  << outSchema->myAtts[attributeNo].name << ": " << typenames[attributeType] << endl;
+	// }
 }
 
 
