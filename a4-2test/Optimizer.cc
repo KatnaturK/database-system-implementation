@@ -396,10 +396,7 @@ void Optimizer::printNodes(ostream& os) {
   os << "Number of selects: " << selectQueryCount << endl;
   os << "Number of joins: " << joinQueryCount << endl;
   if (groupingAtts) {
-    os << "GROUPING ON ";
-    for (NameList* att = groupingAtts; att; att = att->next)
-      os << att->name << " ";
-    os << endl;
+    os << "GROUPING ON " << endl;
     for(NameList* att = groupingAtts; att; att = att->next) {
       os << "		" << "Att " << att->name << endl;
     }

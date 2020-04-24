@@ -158,7 +158,7 @@ FUNCTION
 TC4
 Number of selects: 1
 Number of joins: 1
-GROUPING ON n.n_regionkey 
+GROUPING ON 
 		Att n.n_regionkey
 PRINTING TREE IN ORDER:
 
@@ -227,7 +227,7 @@ FUNCTION
 TC5
 Number of selects: 1
 Number of joins: 2
-GROUPING ON r.r_regionkey 
+GROUPING ON 
 		Att r.r_regionkey
 PRINTING TREE IN ORDER:
 
