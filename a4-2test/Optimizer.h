@@ -56,7 +56,7 @@ private:
   Optimizer& operator = (const Optimizer&);
   
   static void concatList(AndList*& left, AndList*& right);
-  
+
   void constructLeafNodes();
   int evalOrder(vector<OptimizerNode*> opNodeOperands, Statistics stats, int bestFound);
   void processJoins();
@@ -100,7 +100,7 @@ protected:
   Statistics* stat;
 
   virtual void print(ostream& os = cout) const;
-  virtual void printAnnot(ostream& os = cout) const = 0;
+  virtual void printOperation(ostream& os = cout) const = 0;
   virtual void printPipe(ostream& os) const = 0;
   virtual void printChildren(ostream& os) const = 0;
 
@@ -116,7 +116,7 @@ class LeafNode: public OptimizerNode {
   Record recordLiteral;
 
   bool hasCNF() {return !selfOperand.isEmpty();}
-  void printAnnot(ostream& os = cout) const;
+  void printOperation(ostream& os = cout) const;
   void printPipe(ostream& os) const;
   void printChildren(ostream& os) const {}
 
@@ -165,7 +165,7 @@ class ProjectNode: private UnaryNode {
   int retainedAtts[MAX_ATTRIBUTE_COUNT];
   int inputAttsCount, numAttsOut;
   
-  void printAnnot(ostream& os = cout) const;  
+  void printOperation(ostream& os = cout) const;  
 };
 
 class DedupNode: private UnaryNode {
@@ -174,7 +174,7 @@ class DedupNode: private UnaryNode {
   friend class Optimizer;
   OrderMaker dedupOrderMaker;
 
-  void printAnnot(ostream& os = cout) const {}
+  void printOperation(ostream& os = cout) const {}
 };
 
 class GroupByNode: private UnaryNode {
@@ -183,9 +183,10 @@ class GroupByNode: private UnaryNode {
   friend class Optimizer;
   OrderMaker orderMakerGrp;
   Function function;
+  Schema* inSchema;
 
   Schema* resultSchema(NameList* attsList, FuncOperator* parseTree, OptimizerNode* opNode);
-  void printAnnot(ostream& os = cout) const;
+  void printOperation(ostream& os = cout) const;
 };
 
 class JoinNode: private BinaryNode {
@@ -195,7 +196,7 @@ class JoinNode: private BinaryNode {
   CNF* selOperand;
   Record recordLiteral;
 
-  void printAnnot(ostream& os = cout) const;
+  void printOperation(ostream& os = cout) const;
 };
 
 class SelectPipeNode: private UnaryNode {
@@ -206,7 +207,7 @@ class SelectPipeNode: private UnaryNode {
   CNF selfOperand;
   Record recordLiteral;
 
-  void printAnnot(ostream& os = cout) const;
+  void printOperation(ostream& os = cout) const;
 };
 
 class SumNode: private UnaryNode {
@@ -214,9 +215,10 @@ class SumNode: private UnaryNode {
 
   friend class Optimizer;
   Function function;
+  Schema* inSchema;
 
   Schema* resultSchema(FuncOperator* parseTree, OptimizerNode* opNode);
-  void printAnnot(ostream& os = cout) const;
+  void printOperation(ostream& os = cout) const;
 };
 
 class WriteNode: private UnaryNode {
@@ -226,7 +228,7 @@ class WriteNode: private UnaryNode {
   FILE* outFile;
 
   void print(ostream& os = cout) const {}
-  void printAnnot(ostream& os = cout) const;
+  void printOperation(ostream& os = cout) const;
 };
 
 #endif

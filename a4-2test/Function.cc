@@ -200,33 +200,36 @@ void Function :: GrowFromParseTree (struct FuncOperator *parseTree, Schema &mySc
 
 }
 
-void Function :: Print () {
+void Function :: Print (Schema* inSchema) {
+	Arithmatic *currOpList = opList;
+	Attribute *attrs = inSchema->GetAtts();
 	for(int i=0; i<numOps; i++) {
+		string name = attrs[currOpList[i].recInput].name;
 		switch (opList[i].myOp) {
 			case PushInt:
-				std::cout <<" "<<"PushInt";
+				std::cout << "		" <<"Att " << name << " (PushInt)" << endl;
 				break;
 			case PushDouble:
-				std::cout <<" "<<"PushDouble";
+				std::cout << "		" <<"Att " << name << " (PushDouble)" << endl;
 				break;
 			case DblMultiply:
-				std::cout <<" "<<"DoubleMultiply";
+				std::cout << "		" <<"Att " << name << " (DoubleMultiply)" << endl;
 				break;
 			case IntMinus:
-				std::cout <<" "<<"IntMinus";
+				std::cout << "		" <<"Att " << name << " (IntMinus)" << endl;
 				break;
 			case DblMinus:
-				std::cout <<" "<<"DoubleMinus";
+				std::cout << "		" <<"Att " << name << " (DoubleMinus)" << endl;
 				break;
 			case ToDouble2Down:
-				std::cout <<" "<<"ToDouble2Down";
+				std::cout << "		" <<"Att " << name << " (ToDouble2Down)" << endl;
 				break;
 			default:
-				std::cout <<" "<<opList[i].myOp;
+				// std::cout <<" "<<opList[i].myOp;
 				break;
 		}
 	}
-	std::cout <<endl;
+	// std::cout <<endl;
 }
 
 Type Function :: Apply (Record &toMe, int &intResult, double &doubleResult) {

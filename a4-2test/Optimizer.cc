@@ -142,7 +142,7 @@ void LeafNode::printPipe(ostream& os) const {
   os << "Output Pipe: " << outPipeId << endl;
 }
 
-void LeafNode::printAnnot(ostream& os) const {}
+void LeafNode::printOperation(ostream& os) const {}
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
 
@@ -152,7 +152,7 @@ void LeafNode::printAnnot(ostream& os) const {}
 SelectPipeNode::SelectPipeNode(CNF inSelfOperand, char* inRelation, char* inAlias, OptimizerNode* inOpNode):
   UnaryNode("SELECT PIPE", new Schema(catalog_path, inRelation, inAlias), inOpNode, NULL), selfOperand(inSelfOperand) {}
 
-void SelectPipeNode::printAnnot(ostream& os) const {
+void SelectPipeNode::printOperation(ostream& os) const {
   os << "SELECTION CNF: " << endl;
   selfOperand.Print(outSchema); 
 }
@@ -186,7 +186,7 @@ void Optimizer::processProjects() {
     opRootNode = new ProjectNode(attsToSelect, opRootNode);
 }
 
-void ProjectNode::printAnnot(ostream& os) const {
+void ProjectNode::printOperation(ostream& os) const {
   // os << retainedAtts[0];
   // for (size_t i=1; i<numAttsOut; ++i) 
   //   os << ',' << retainedAtts[i];
@@ -238,7 +238,7 @@ int Optimizer::evalOrder(vector<OptimizerNode*> operands, Statistics inStats, in
     constructNode(pushed, needsRecycling, JoinNode, newJoinNode, (boolean, pushed, left, right, &inStats));
     operands.push_back(newJoinNode);
     freeNodeList.push_back(newJoinNode);
-    if (newJoinNode->processingEstimation<=0 || newJoinNode->processingCost>bestFound) 
+    if (newJoinNode->processingEstimation <= 0 || newJoinNode->processingCost > bestFound) 
       break;
   }
 
@@ -264,7 +264,7 @@ void Optimizer::concatList(AndList*& left, AndList*& right) {
   right = NULL;
 }
 
-void JoinNode::printAnnot(ostream& os) const {
+void JoinNode::printOperation(ostream& os) const {
   os << "CNF: " << endl;
   selOperand->Print(outSchema);
 }
@@ -277,6 +277,7 @@ void JoinNode::printAnnot(ostream& os) const {
 SumNode::SumNode(FuncOperator* inParseTree, OptimizerNode* inOpNode):
   UnaryNode("SUM", resultSchema(inParseTree, inOpNode), inOpNode, NULL) {
   function.GrowFromParseTree (inParseTree, *inOpNode->outSchema);
+  inSchema = inOpNode->outSchema;
 }
 
 Schema* SumNode::resultSchema(FuncOperator* inParseTree, OptimizerNode* inOpNode) {
@@ -303,8 +304,9 @@ void Optimizer::ProcessSums() {
   }
 }
 
-void SumNode::printAnnot(ostream& os) const {
-  os << "FUNCTION "; (const_cast<Function*>(&function))->Print();
+void SumNode::printOperation(ostream& os) const {
+  os << "FUNCTION " << endl;
+  (const_cast<Function*>(&function))->Print(inSchema);
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
@@ -316,6 +318,7 @@ GroupByNode::GroupByNode(NameList* inAtts, FuncOperator* inParseTree, OptimizerN
   UnaryNode("GROUP BY", resultSchema(inAtts, inParseTree, inOpNode), inOpNode, NULL) {
   orderMakerGrp.growFromParseTree(inAtts, inOpNode->outSchema);
   function.GrowFromParseTree (inParseTree, *inOpNode->outSchema);
+  inSchema = inOpNode->outSchema;
 }
 
 Schema* GroupByNode::resultSchema(NameList* inAtts, FuncOperator* inParseTree, OptimizerNode* inOpNode) {
@@ -343,16 +346,16 @@ Schema* GroupByNode::resultSchema(NameList* inAtts, FuncOperator* inParseTree, O
   return new Schema ("", numAtts, resultAtts);
 }
 
-void GroupByNode::printAnnot(ostream& os) const {
-  os << "OrderMaker: "; (const_cast<OrderMaker*>(&orderMakerGrp))->Print(outSchema);
-  for(NameList* att = groupingAtts; att; att = att->next) {
+void GroupByNode::printOperation(ostream& os) const {
+  os << "OrderMaker: ";
+  (const_cast<OrderMaker*>(&orderMakerGrp))->Print(outSchema);
+  for(NameList* att = groupingAtts; att; att = att->next)
     os << "		" << "Att " << att->name << endl;
-  }
   os << "GROUPING ON " << endl;
-  for(NameList* att = groupingAtts; att; att = att->next) {
+  for(NameList* att = groupingAtts; att; att = att->next)
     os << "		" << "Att " << att->name << endl;
-  }
-  os << "FUNCTION "; (const_cast<Function*>(&function))->Print();
+  os << "FUNCTION " << endl;
+  (const_cast<Function*>(&function))->Print(inSchema);
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
@@ -380,7 +383,7 @@ void Optimizer::processWrite() {
   opRootNode = new WriteNode(stdout, opRootNode);
 }
 
-void WriteNode::printAnnot(ostream& os) const {
+void WriteNode::printOperation(ostream& os) const {
   os << "Output to " << outFile << endl;
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
@@ -437,7 +440,7 @@ void OptimizerNode::print(ostream& os) const {
   printPipe(os);
   os << "Output schema:" << endl;
   outSchema->print(os);
-  printAnnot(os);
+  printOperation(os);
   os << "\n";
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
