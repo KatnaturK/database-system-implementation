@@ -201,7 +201,32 @@ void Function :: GrowFromParseTree (struct FuncOperator *parseTree, Schema &mySc
 }
 
 void Function :: Print () {
-
+	for(int i=0; i<numOps; i++) {
+		switch (opList[i].myOp) {
+			case PushInt:
+				std::cout <<" "<<"PushInt";
+				break;
+			case PushDouble:
+				std::cout <<" "<<"PushDouble";
+				break;
+			case DblMultiply:
+				std::cout <<" "<<"DoubleMultiply";
+				break;
+			case IntMinus:
+				std::cout <<" "<<"IntMinus";
+				break;
+			case DblMinus:
+				std::cout <<" "<<"DoubleMinus";
+				break;
+			case ToDouble2Down:
+				std::cout <<" "<<"ToDouble2Down";
+				break;
+			default:
+				std::cout <<" "<<opList[i].myOp;
+				break;
+		}
+	}
+	std::cout <<endl;
 }
 
 Type Function :: Apply (Record &toMe, int &intResult, double &doubleResult) {

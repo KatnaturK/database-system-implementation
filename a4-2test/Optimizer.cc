@@ -12,7 +12,7 @@
   concatList(recycler, pushed);
 
 
-Optimizer::Optimizer(Statistics* inStats): stats(inStats), isUsedPrev(NULL), selectQeryCount(0), joinQueryCount(0) {
+Optimizer::Optimizer(Statistics* inStats): stats(inStats), isUsedPrev(NULL), selectQueryCount(0), joinQueryCount(0) {
   constructLeafNodes(); 
   processJoins();
   ProcessSums();
@@ -129,7 +129,7 @@ void Optimizer::constructLeafNodes() {
     constructNode(pushed, isUsedPrev, LeafNode, newLeaf, (boolean, pushed, table->tableName, table->aliasAs, stats));
     if(newLeaf->hasCNF()) {
       OptimizerNode* selectPipeNode = new SelectPipeNode(newLeaf->selfOperand, table->tableName, table->aliasAs, newLeaf);
-      selectQeryCount++;
+      selectQueryCount++;
       nodes.push_back(selectPipeNode);
     } else {
       nodes.push_back(newLeaf);
@@ -187,10 +187,10 @@ void Optimizer::processProjects() {
 }
 
 void ProjectNode::printAnnot(ostream& os) const {
-  os << retainedAtts[0];
-  for (size_t i=1; i<numAttsOut; ++i) 
-    os << ',' << retainedAtts[i];
-  os << endl;
+  // os << retainedAtts[0];
+  // for (size_t i=1; i<numAttsOut; ++i) 
+  //   os << ',' << retainedAtts[i];
+  // os << endl;
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
@@ -203,7 +203,8 @@ JoinNode::JoinNode(AndList*& currAndList, AndList*& pushedAndList, OptimizerNode
   pushedAndList = pushSelection(currAndList, outSchema);
   processingEstimation = stat->Estimate(pushedAndList, relations, relationCount);
   processingCost = inLeftOpNode->processingCost + processingEstimation + inRightOpNode->processingCost;
-  selOperand.GrowFromParseTree(pushedAndList, outSchema, recordLiteral);
+  selOperand = new CNF();
+  selOperand->GrowFromParseTree(pushedAndList, outSchema, recordLiteral);
 }
 
 void Optimizer::processJoins() {
@@ -265,7 +266,7 @@ void Optimizer::concatList(AndList*& left, AndList*& right) {
 
 void JoinNode::printAnnot(ostream& os) const {
   os << "CNF: " << endl;
-  selOperand.Print(outSchema);
+  selOperand->Print(outSchema);
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
 
@@ -343,8 +344,14 @@ Schema* GroupByNode::resultSchema(NameList* inAtts, FuncOperator* inParseTree, O
 }
 
 void GroupByNode::printAnnot(ostream& os) const {
-  // os << "OrderMaker: "; (const_cast<OrderMaker*>(&orderMakerGrp))->Print();
-  os << "GROUPING ON" << endl;
+  os << "OrderMaker: "; (const_cast<OrderMaker*>(&orderMakerGrp))->Print(outSchema);
+  for(NameList* att = groupingAtts; att; att = att->next) {
+    os << "		" << "Att " << att->name << endl;
+  }
+  os << "GROUPING ON " << endl;
+  for(NameList* att = groupingAtts; att; att = att->next) {
+    os << "		" << "Att " << att->name << endl;
+  }
   os << "FUNCTION "; (const_cast<Function*>(&function))->Print();
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
@@ -383,7 +390,7 @@ void WriteNode::printAnnot(ostream& os) const {
  * 
 */
 void Optimizer::printNodes(ostream& os) {
-  os << "Number of selects: " << selectQeryCount << endl;
+  os << "Number of selects: " << selectQueryCount << endl;
   os << "Number of joins: " << joinQueryCount << endl;
   if (groupingAtts) {
     os << "GROUPING ON ";

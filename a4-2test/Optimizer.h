@@ -36,32 +36,38 @@ class OptimizerNode;
 
 class Optimizer {
 public:
+  Optimizer() {
+   isUsedPrev = NULL;
+   joinQueryCount = 0;
+   selectQueryCount = 0;
+  };
   Optimizer(Statistics* stats);
   ~Optimizer() {}
 
-private:
-  Optimizer(const Optimizer&);
-  Optimizer& operator = (const Optimizer&);
-  
   int joinQueryCount;
-  int selectQeryCount;
+  int selectQueryCount;
   OptimizerNode* opRootNode;
   Statistics* stats;
   AndList* isUsedPrev;
   vector<OptimizerNode*> nodes;
 
+private:
+  Optimizer(const Optimizer&);
+  Optimizer& operator = (const Optimizer&);
+  
+  static void concatList(AndList*& left, AndList*& right);
+  
   void constructLeafNodes();
+  int evalOrder(vector<OptimizerNode*> opNodeOperands, Statistics stats, int bestFound);
   void processJoins();
-  void sortJoins();
   void ProcessSums();
   void processProjects();
   void processDistinct();
   void processWrite();
-  int evalOrder(vector<OptimizerNode*> opNodeOperands, Statistics stats, int bestFound);
   void printNodes(ostream& os = cout);
   void printNodesInOrder(OptimizerNode* opNode, ostream& os = cout);
   void recycleList(AndList* alist) { concatList(isUsedPrev, alist); }
-  static void concatList(AndList*& left, AndList*& right);
+  void sortJoins();
 };
 
 class OptimizerNode {
@@ -186,7 +192,7 @@ class JoinNode: private BinaryNode {
   JoinNode(AndList*& boolean, AndList*& pushed, OptimizerNode* l, OptimizerNode* r, Statistics* stats);
 
   friend class Optimizer;
-  CNF selOperand;
+  CNF* selOperand;
   Record recordLiteral;
 
   void printAnnot(ostream& os = cout) const;

@@ -8,12 +8,15 @@ endif
 
 a42.out: BigQ.o Comparison.o ComparisonEngine.o DBFile.o File.o Function.o GenericDBFile.o HeapFile.o Optimizer.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o a42.o
 	$(CC) -o a42.out BigQ.o Comparison.o ComparisonEngine.o DBFile.o File.o Function.o GenericDBFile.o HeapFile.o Optimizer.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o a42.o -lfl -lpthread
+
+gtest.out: BigQ.o Comparison.o ComparisonEngine.o DBFile.o File.o Function.o GenericDBFile.o HeapFile.o Optimizer.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o gtest.o
+	$(CC) -o gtest.out BigQ.o Comparison.o ComparisonEngine.o DBFile.o File.o Function.o GenericDBFile.o HeapFile.o Optimizer.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o gtest.o -lfl -lpthread -lgtest
 	
-main:   y.tab.o lex.yy.o main.o
-	$(CC) -o main y.tab.o lex.yy.o main.o -lfl
-	
-a42.o : a42.cc
+a42.o: a42.cc
 	$(CC) -g -c a42.cc
+
+gtest.o: gtest.cc
+	$(CC) -g -c gtest.cc
 
 BigQ.o: BigQ.cc
 	$(CC) -g -c BigQ.cc
