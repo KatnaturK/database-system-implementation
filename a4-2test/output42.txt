@@ -151,7 +151,7 @@ Input pipe: 4
 Output pipe: 5
 Output schema:
 		Att sum: INT
-FUNCTION 
+Function: SUM
 		Att n.n_nationkey (PushInt)
 
 ***************************************************************************************************************************
@@ -220,7 +220,7 @@ OrderMaker:  number of attributes = 1
 		Att n.n_regionkey
 GROUPING ON 
 		Att n.n_regionkey
-FUNCTION 
+Function: GROUP BY
 		Att n.n_regionkey (PushInt)
 
 ***************************************************************************************************************************
@@ -348,7 +348,7 @@ OrderMaker:  number of attributes = 1
 		Att r.r_regionkey
 GROUPING ON 
 		Att r.r_regionkey
-FUNCTION 
+Function: GROUP BY
 		Att n.n_nationkey (PushInt)
 		Att r.r_regionkey (PushInt)
 

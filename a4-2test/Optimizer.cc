@@ -305,7 +305,7 @@ void Optimizer::ProcessSums() {
 }
 
 void SumNode::printOperation(ostream& os) const {
-  os << "FUNCTION " << endl;
+  os << "Function: SUM" << endl;
   (const_cast<Function*>(&function))->Print(inSchema);
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
@@ -354,7 +354,7 @@ void GroupByNode::printOperation(ostream& os) const {
   os << "GROUPING ON " << endl;
   for(NameList* att = groupingAtts; att; att = att->next)
     os << "		" << "Att " << att->name << endl;
-  os << "FUNCTION " << endl;
+  os << "Function: GROUP BY" << endl;
   (const_cast<Function*>(&function))->Print(inSchema);
 }
 /*** x *** x *** x *** x *** x *** x *** x *** x *** x ***/
