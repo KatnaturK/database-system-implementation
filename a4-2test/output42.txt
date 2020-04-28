@@ -1,0 +1,355 @@
+TC1
+Number of selects: 1
+Number of joins: 0
+PRINTING TREE IN ORDER:
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 1
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+
+ *********** 
+SELECT PIPE operation
+Input pipe: 1
+Output pipe: 2
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+SELECTION CNF: 
+( n.n_name = n.n_nationkey ) 
+
+ *********** 
+PROJECT operation
+Input pipe: 2
+Output pipe: 3
+Output schema:
+		Att n.n_nationkey: INT
+
+***************************************************************************************************************************
+TC2
+Number of selects: 1
+Number of joins: 1
+PRINTING TREE IN ORDER:
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 2
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+
+ *********** 
+SELECT PIPE operation
+Input pipe: 2
+Output pipe: 3
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+SELECTION CNF: 
+( n.n_nationkey > n.n_nationkey ) 
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 1
+Output schema:
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+
+ *********** 
+JOIN operation
+Left input pipe: 3
+Right input pipe: 1
+Output pipe: 4
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+CNF: 
+( n.n_regionkey = r.r_regionkey ) 
+
+ *********** 
+PROJECT operation
+Input pipe: 4
+Output pipe: 5
+Output schema:
+		Att n.n_name: STRING
+
+***************************************************************************************************************************
+TC3
+Number of selects: 1
+Number of joins: 1
+PRINTING TREE IN ORDER:
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 2
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+
+ *********** 
+SELECT PIPE operation
+Input pipe: 2
+Output pipe: 3
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+SELECTION CNF: 
+( n.n_name = n.n_nationkey ) 
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 1
+Output schema:
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+
+ *********** 
+JOIN operation
+Left input pipe: 3
+Right input pipe: 1
+Output pipe: 4
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+CNF: 
+( n.n_regionkey = r.r_regionkey ) 
+
+ *********** 
+SUM operation
+Input pipe: 4
+Output pipe: 5
+Output schema:
+		Att sum: INT
+Function: SUM
+		Att n.n_nationkey (PushInt)
+
+***************************************************************************************************************************
+TC4
+Number of selects: 1
+Number of joins: 1
+GROUPING ON 
+		Att n.n_regionkey
+PRINTING TREE IN ORDER:
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 2
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+
+ *********** 
+SELECT PIPE operation
+Input pipe: 2
+Output pipe: 3
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+SELECTION CNF: 
+( n.n_name = n.n_nationkey ) 
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 1
+Output schema:
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+
+ *********** 
+JOIN operation
+Left input pipe: 3
+Right input pipe: 1
+Output pipe: 4
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+CNF: 
+( n.n_regionkey = r.r_regionkey ) 
+
+ *********** 
+GROUP BY operation
+Input pipe: 4
+Output pipe: 5
+Output schema:
+		Att sum: INT
+		Att n.n_regionkey: INT
+OrderMaker:  number of attributes = 1
+		Att n.n_regionkey
+GROUPING ON 
+		Att n.n_regionkey
+Function: GROUP BY
+		Att n.n_regionkey (PushInt)
+
+***************************************************************************************************************************
+TC5
+Number of selects: 1
+Number of joins: 2
+GROUPING ON 
+		Att r.r_regionkey
+PRINTING TREE IN ORDER:
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 3
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+
+ *********** 
+SELECT PIPE operation
+Input pipe: 3
+Output pipe: 4
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+SELECTION CNF: 
+( n.n_nationkey > n.n_nationkey ) 
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 2
+Output schema:
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+
+ *********** 
+JOIN operation
+Left input pipe: 4
+Right input pipe: 2
+Output pipe: 5
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+CNF: 
+( n.n_regionkey = r.r_regionkey ) 
+
+ *********** 
+SELECT FILE operation
+Input Pipe: 0
+Output Pipe: 1
+Output schema:
+		Att c.c_custkey: INT
+		Att c.c_name: STRING
+		Att c.c_address: STRING
+		Att c.c_nationkey: INT
+		Att c.c_phone: STRING
+		Att c.c_acctbal: DOUBLE
+		Att c.c_mktsegment: STRING
+		Att c.c_comment: STRING
+
+ *********** 
+JOIN operation
+Left input pipe: 5
+Right input pipe: 1
+Output pipe: 6
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+		Att c.c_custkey: INT
+		Att c.c_name: STRING
+		Att c.c_address: STRING
+		Att c.c_nationkey: INT
+		Att c.c_phone: STRING
+		Att c.c_acctbal: DOUBLE
+		Att c.c_mktsegment: STRING
+		Att c.c_comment: STRING
+CNF: 
+( n.n_nationkey = c.c_nationkey ) 
+
+ *********** 
+DEDUPLICATION operation
+Input pipe: 6
+Output pipe: 7
+Output schema:
+		Att n.n_nationkey: INT
+		Att n.n_name: STRING
+		Att n.n_regionkey: INT
+		Att n.n_comment: STRING
+		Att r.r_regionkey: INT
+		Att r.r_name: STRING
+		Att r.r_comment: STRING
+		Att c.c_custkey: INT
+		Att c.c_name: STRING
+		Att c.c_address: STRING
+		Att c.c_nationkey: INT
+		Att c.c_phone: STRING
+		Att c.c_acctbal: DOUBLE
+		Att c.c_mktsegment: STRING
+		Att c.c_comment: STRING
+
+ *********** 
+GROUP BY operation
+Input pipe: 7
+Output pipe: 8
+Output schema:
+		Att sum: INT
+		Att r.r_regionkey: INT
+OrderMaker:  number of attributes = 1
+		Att r.r_regionkey
+GROUPING ON 
+		Att r.r_regionkey
+Function: GROUP BY
+		Att n.n_nationkey (PushInt)
+		Att r.r_regionkey (PushInt)
+
+***************************************************************************************************************************

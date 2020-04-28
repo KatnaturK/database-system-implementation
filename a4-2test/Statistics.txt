@@ -1,0 +1,85 @@
+
+Atrribute: customer | Tuple Count: 150000 | Groups: customer | Group Size: 1
+Attribute: c_acctbal | Count: 140187
+Attribute: c_address | Count: 150000
+Attribute: c_comment | Count: 149965
+Attribute: c_custkey | Count: 150000
+Attribute: c_mktsegment | Count: 5
+Attribute: c_name | Count: 150000
+Attribute: c_nationkey | Count: 25
+Attribute: c_phone | Count: 150000
+
+
+Atrribute: lineitem | Tuple Count: 6001215 | Groups: lineitem | Group Size: 1
+Attribute: l_comment | Count: 4501941
+Attribute: l_commitdate | Count: 2466
+Attribute: l_discount | Count: 11
+Attribute: l_extendedprice | Count: 933900
+Attribute: l_linenumbe | Count: 7
+Attribute: l_linestatus | Count: 2
+Attribute: l_orderkey | Count: 1500000
+Attribute: l_partkey | Count: 200000
+Attribute: l_quantity | Count: 50
+Attribute: l_receiptdate | Count: 0
+Attribute: l_returnflag | Count: 3
+Attribute: l_shipdate | Count: 2526
+Attribute: l_shipinstruct | Count: 4
+Attribute: l_shipmode | Count: 7
+Attribute: l_suppkey | Count: 10000
+Attribute: l_tax | Count: 9
+
+
+Atrribute: nation | Tuple Count: 25 | Groups: nation | Group Size: 1
+Attribute: n_comment | Count: 25
+Attribute: n_name | Count: 25
+Attribute: n_nationkey | Count: 25
+Attribute: n_regionkey | Count: 5
+
+
+Atrribute: orders | Tuple Count: 1500000 | Groups: orders | Group Size: 1
+Attribute: o_clerk | Count: 1000
+Attribute: o_comment | Count: 1478684
+Attribute: o_custkey | Count: 150000
+Attribute: o_orderdate | Count: 2406
+Attribute: o_orderkey | Count: 1500000
+Attribute: o_orderpriority | Count: 5
+Attribute: o_orderstatus | Count: 3
+Attribute: o_shippriority | Count: 1
+Attribute: o_totalprice | Count: 1464556
+
+
+Atrribute: part | Tuple Count: 200000 | Groups: part | Group Size: 1
+Attribute: p_brand | Count: 25
+Attribute: p_comment | Count: 127459
+Attribute: p_container | Count: 40
+Attribute: p_mfgr | Count: 5
+Attribute: p_name | Count: 199996
+Attribute: p_partkey | Count: 200000
+Attribute: p_retailprice | Count: 20899
+Attribute: p_size | Count: 50
+Attribute: p_type | Count: 150
+
+
+Atrribute: partsupp | Tuple Count: 800000 | Groups: partsupp | Group Size: 1
+Attribute: ps_availqty | Count: 9999
+Attribute: ps_comment | Count: 799123
+Attribute: ps_partkey | Count: 200000
+Attribute: ps_suppkey | Count: 10000
+Attribute: ps_supplycost | Count: 99865
+
+
+Atrribute: region | Tuple Count: 5 | Groups: region | Group Size: 1
+Attribute: r_comment | Count: 5
+Attribute: r_name | Count: 5
+Attribute: r_regionkey | Count: 5
+
+
+Atrribute: supplier | Tuple Count: 10000 | Groups: supplier | Group Size: 1
+Attribute: s_acctbal | Count: 9955
+Attribute: s_address | Count: 100000
+Attribute: s_comment | Count: 10000
+Attribute: s_name | Count: 100000
+Attribute: s_nationkey | Count: 25
+Attribute: s_phone | Count: 100000
+Attribute: s_suppkey | Count: 10000
+

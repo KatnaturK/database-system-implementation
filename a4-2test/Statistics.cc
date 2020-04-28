@@ -293,7 +293,7 @@ bool Statistics::GivesError(struct AndList *parseTree, char *relNames[], int num
     return noError;
 }
 
-void Statistics::LoadAllStatistics() {
+void Statistics::LoadRelStats() {
     char *relName[] = {(char*)"supplier",(char*)"partsupp", (char*)"lineitem",
                 (char*)"orders",(char*)"customer",(char*)"nation", (char*)"part", (char*)"region"};
     AddRel(relName[0],10000);     //supplier

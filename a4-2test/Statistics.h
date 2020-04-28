@@ -83,7 +83,7 @@ public:
 	double Estimate(struct AndList *parseTree, char **relNames, int numToJoin);
 	void Read(char *fromWhere);
 	void Write(char *fromWhere);
-    void LoadAllStatistics();
+    void LoadRelStats();
 
 	double Assess(struct OrList *orList, map<string,long> &distinctValues);
 	bool AtrrtibutePresent(char *attributeValue, char *relNames[], int numToJoin, map<string,long> &distinctValues);
