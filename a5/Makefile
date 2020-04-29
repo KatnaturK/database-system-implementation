@@ -6,14 +6,14 @@ ifdef linux
 tag = -n
 endif
 
-test.out: BigQ.o Comparison.o ComparisonEngine.o DBFile.o Ddl.o File.o Function.o HeapFile.o Interpreter.o QueryPlan.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o test.o
-	$(CC) -o test.out BigQ.o Comparison.o ComparisonEngine.o DBFile.o Ddl.o File.o Function.o HeapFile.o Interpreter.o QueryPlan.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o test.o -lfl -lpthread
+a5.out: BigQ.o Comparison.o ComparisonEngine.o DBFile.o Ddl.o File.o Function.o HeapFile.o Main.o QueryPlan.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o a5.o
+	$(CC) -o a5.out BigQ.o Comparison.o ComparisonEngine.o DBFile.o Ddl.o File.o Function.o HeapFile.o Main.o QueryPlan.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o a5.o -lfl -lpthread
 
-gtest.out: BigQ.o Comparison.o ComparisonEngine.o DBFile.o Ddl.o File.o Function.o HeapFile.o Interpreter.o QueryPlan.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o gtest.o
-	$(CC) -o gtest.out BigQ.o Comparison.o ComparisonEngine.o DBFile.o Ddl.o File.o Function.o HeapFile.o Interpreter.o QueryPlan.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o gtest.o -lfl -lpthread -lgtest
+gtest.out: BigQ.o Comparison.o ComparisonEngine.o DBFile.o Ddl.o File.o Function.o HeapFile.o Main.o QueryPlan.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o gtest.o
+	$(CC) -o gtest.out BigQ.o Comparison.o ComparisonEngine.o DBFile.o Ddl.o File.o Function.o HeapFile.o Main.o QueryPlan.o Pipe.o Record.o RelOp.o Schema.o SortedFile.o Statistics.o y.tab.o lex.yy.o gtest.o -lfl -lpthread -lgtest
 
-test.o: test.cc
-	$(CC) -g -c test.cc
+a5.o: a5.cc
+	$(CC) -g -c a5.cc
 
 gtest.o: gtest.cc
 	$(CC) -g -c gtest.cc
@@ -42,8 +42,8 @@ Function.o: Function.cc
 HeapFile.o: HeapFile.cc
 	$(CC) -g -c HeapFile.cc
 
-Interpreter.o: Interpreter.cc
-	$(CC) -g -c Interpreter.cc
+Main.o: Main.cc
+	$(CC) -g -c Main.cc
 
 QueryPlan.o: QueryPlan.cc
 	$(CC) -g -c QueryPlan.cc

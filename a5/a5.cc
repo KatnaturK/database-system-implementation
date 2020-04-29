@@ -1,15 +1,15 @@
 #include <iostream>
 
-#include "Interpreter.h"
+#include "Main.h"
 
 using namespace std;
 
 char* catalog_path = "catalog";
 char* dbfile_dir = "";
-char* tpch_dir = "../DATA/1G";
+char* tpch_dir = "";
 
 int main (int argc, char* argv[]) {
-  Interpreter it;
+  Main it;
   it.run();
   return 0;
 }

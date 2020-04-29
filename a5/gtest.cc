@@ -6,7 +6,7 @@
 #include <algorithm>
 
 #include "Errors.h"
-#include "Interpreter.h"
+#include "Main.h"
 #include "ParseTree.h"
 #include "QueryPlan.h"
 #include "Statistics.h"
