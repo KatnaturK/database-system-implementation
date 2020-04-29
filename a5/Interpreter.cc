@@ -7,7 +7,7 @@
 #include "QueryPlan.h"
 #include "Ddl.h"
 
-using std::cout;
+using namespace std;
 
 extern "C" {
   int yyparse(void);     // defined in y.tab.c
@@ -67,14 +67,14 @@ void Interpreter::run() {
         s.Read(fileName);
 
         if (newtable) {
-          if (d.createTable()) cout << "Create table " << newtable << std::endl;
-          else cout << "Table " << newtable << " already exists." << std::endl;
+          if (d.createTable()) cout << "Create table " << newtable << endl;
+          else cout << "Table " << newtable << " already exists." << endl;
         } else if (oldtable && newfile) {
-          if (d.insertInto()) cout << "Insert into " << oldtable << std::endl;
-          else cout << "Insert failed." << std::endl;
+          if (d.insertInto()) cout << "Insert into " << oldtable << endl;
+          else cout << "Insert failed." << endl;
         } else if (oldtable && !newfile) {
-          if (d.dropTable()) cout << "Drop table " << oldtable << std::endl;
-          else cout << "Table " << oldtable << " does not exist." << std::endl;
+          if (d.dropTable()) cout << "Drop table " << oldtable << endl;
+          else cout << "Table " << oldtable << " does not exist." << endl;
         } else if (deoutput) {
           plan.setOutput(deoutput);
         } else if (attsToSelect || finalFunction) {
@@ -93,6 +93,9 @@ void Interpreter::run() {
 	          exit(0);
           }
           break;
+
+      default: 
+        cout << "\n--- Enter a valid option ----\n" << endl;
     }
   }
 }
