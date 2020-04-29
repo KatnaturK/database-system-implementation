@@ -140,6 +140,12 @@ SQL: SELECT WhatIWant FROM Tables WHERE AndList ';'
         YYACCEPT;
 }
 
+| SET OUTPUT Name ';'
+{
+	deoutput = $3;
+        YYACCEPT;
+}
+
 | SET OUTPUT String ';'
 {
 	deoutput = $3;

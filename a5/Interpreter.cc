@@ -56,8 +56,9 @@ void Interpreter::run() {
             cout << "\n--- Connection Not Established Yet---\n" << endl;
             continue;
           }
-          cout << "\nSET OUTPUT <STDOUT(default)>, <'file_name'>, <NONE> and Enter Query CNF(enter ';' at the end of the query).\n" << endl;
-          cout << "\n" << endl;
+          cout << "\nEnter SET OUTPUT <STDOUT(default)>, <'file_name'>, <NONE>" << endl;
+          cout << "                       OR                                  " << endl;
+          cout << "Enter Query CNF(enter ';' at the end).                   \n" << endl;
           if (yyparse() != 0) {
             cout << "\nCan't parse your CNF.\n";
             continue;
